@@ -1,16 +1,17 @@
 import * as Location from 'expo-location';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { createElement, useEffect, useState } from 'react';
-import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 const MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 const ROUTES_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
-const HORIZONTAL_PADDING = Spacing.four;
 const MAP_ASPECT_RATIO = 4 / 3;
 
 const API_MODES = {
@@ -185,7 +186,7 @@ function buildMapUrl(origin: Coords | null, destination: MapDestination) {
 }
 
 function GoogleMapEmbed({ destination }: { destination: MapDestination }) {
-  const { width } = useWindowDimensions();
+  const theme = useTheme();
   const { coords, error, loading } = useCurrentLocation();
   const { info, error: routeError } = useRouteInfo(coords, destination);
   const mapUrl = buildMapUrl(coords, destination);
@@ -193,15 +194,16 @@ function GoogleMapEmbed({ destination }: { destination: MapDestination }) {
   return (
     <View
       style={[
-        styles.mapWrapper,
-        { maxWidth: Math.min(MaxContentWidth, width - HORIZONTAL_PADDING * 2) },
+        styles.mapCard,
+        { backgroundColor: theme.backgroundElement, borderColor: theme.border },
       ]}>
-      <View>
+      <View style={styles.destinationDetails}>
         <ThemedText type="subtitle">{destination.name}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
           {destination.address}
         </ThemedText>
       </View>
+
       <View style={styles.mapContainer}>
         {Platform.OS === 'web' ? (
           createElement('iframe', {
@@ -219,19 +221,35 @@ function GoogleMapEmbed({ destination }: { destination: MapDestination }) {
         )}
       </View>
 
-      {loading && <ThemedText type="small">Getting your location…</ThemedText>}
-      {error && (
-        <ThemedText type="small">{error}. Showing the destination only.</ThemedText>
-      )}
-      {info && (
-        <View style={styles.routeInfo}>
-          <ThemedText type="subtitle">{info.duration}</ThemedText>
-          <ThemedText type="small">
-            {info.distance} by {TRAVEL_MODE} to {destination.name}
-          </ThemedText>
+      {(loading || error || info || routeError) && (
+        <View style={styles.routeDetails}>
+          {loading && (
+            <ThemedText type="small" themeColor="textSecondary">
+              Getting your location…
+            </ThemedText>
+          )}
+          {error && (
+            <ThemedText type="small" themeColor="textSecondary">
+              {error}. Showing the destination only.
+            </ThemedText>
+          )}
+          {info && (
+            <View style={[styles.routeInfo, { backgroundColor: theme.accentSoft }]}>
+              <ThemedText type="smallBold" themeColor="accent">
+                {info.duration}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {info.distance} walk to {destination.name}
+              </ThemedText>
+            </View>
+          )}
+          {routeError && (
+            <ThemedText type="small" themeColor="textSecondary">
+              {routeError}
+            </ThemedText>
+          )}
         </View>
       )}
-      {routeError && <ThemedText type="small">{routeError}</ThemedText>}
     </View>
   );
 }
@@ -242,31 +260,84 @@ export default function MapScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <GoogleMapEmbed destination={destination} />
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <Pressable
+            accessibilityLabel="Back to results"
+            accessibilityRole="button"
+            hitSlop={Spacing.two}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/');
+              }
+            }}
+            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
+            <ThemedText style={styles.backArrow}>‹</ThemedText>
+            <ThemedText type="smallBold">Results</ThemedText>
+          </Pressable>
+
+          <GoogleMapEmbed destination={destination} />
+        </ScrollView>
+      </SafeAreaView>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'center',
     flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: HORIZONTAL_PADDING,
   },
-  mapWrapper: {
-    gap: Spacing.three,
+  safeArea: {
+    alignSelf: 'center',
+    flex: 1,
+    maxWidth: MaxContentWidth,
     width: '100%',
+  },
+  scrollContent: {
+    gap: Spacing.five,
+    paddingBottom: Spacing.five,
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.three,
+  },
+  backButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    gap: Spacing.one,
+    marginLeft: -Spacing.one,
+  },
+  backArrow: {
+    fontSize: 30,
+    lineHeight: 26,
+  },
+  mapCard: {
+    borderRadius: Spacing.four,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  destinationDetails: {
+    gap: Spacing.half,
+    padding: Spacing.three,
   },
   mapContainer: {
     aspectRatio: MAP_ASPECT_RATIO,
-    overflow: 'hidden',
     width: '100%',
   },
   map: {
     flex: 1,
   },
+  routeDetails: {
+    gap: Spacing.two,
+    padding: Spacing.three,
+  },
   routeInfo: {
-    gap: Spacing.one,
+    borderRadius: Spacing.two,
+    gap: Spacing.half,
+    padding: Spacing.two,
+  },
+  pressed: {
+    opacity: 0.72,
   },
 });
