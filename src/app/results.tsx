@@ -112,9 +112,39 @@ function PlaceCard({ recommendation, rank, expanded, onToggle }: PlaceCardProps)
         </View>
         <View style={styles.placeName}>
           <ThemedText style={styles.placeTitle}>{recommendation.place}</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {recommendation.travelTime}
-          </ThemedText>
+          <View style={{ alignItems: 'center', flexDirection: 'row', gap: Spacing.two }}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {recommendation.travelTime}
+            </ThemedText>
+            <Pressable
+              accessibilityLabel={`Navigate to ${recommendation.place}`}
+              accessibilityRole="button"
+              hitSlop={Spacing.two}
+              onPress={() =>
+                router.push({
+                  pathname: '/map',
+                  params: {
+                    address: recommendation.location.address,
+                    latitude: String(recommendation.location.latitude),
+                    longitude: String(recommendation.location.longitude),
+                    name: recommendation.place,
+                  },
+                })
+              }
+              style={({ pressed }) => [
+                {
+                  backgroundColor: theme.accentSoft,
+                  borderRadius: Spacing.two,
+                  paddingHorizontal: Spacing.two,
+                  paddingVertical: Spacing.half,
+                },
+                pressed && styles.pressed,
+              ]}>
+              <ThemedText type="smallBold" themeColor="accent">
+                Navigate →
+              </ThemedText>
+            </Pressable>
+          </View>
         </View>
       </View>
 
