@@ -1,294 +1,473 @@
-import * as Device from 'expo-device';
-import * as Location from 'expo-location';
-import { createElement, useEffect, useState } from 'react';
-import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { router } from 'expo-router';
+import { useState, type ReactNode } from 'react';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { DietaryPreferenceList } from '@/components/dietary-preference-list';
+import { SelectionChipGroup } from '@/components/selection-chip-group';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import {
+  allergyOptions,
+  dietaryRestrictionOptions,
+  eatingPreferenceOptions,
+  getDefaultSearchCriteria,
+  transportOptions,
+  travelTimeOptions,
+  type Allergen,
+  type DietaryRestriction,
+  type EatingPreference,
+  type Transport,
+  type TravelTime,
+} from '@/services/recommendations';
 
-// Put your key in .env as EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
-const MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
-
-const DESTINATION = 'Shawarma Hub, Waterloo, ON';
-
-// Embed API mode -> Routes API mode
-const API_MODES = {
-  driving: 'DRIVE',
-  walking: 'WALK',
-  bicycling: 'BICYCLE',
-  transit: 'TRANSIT',
-} as const;
-const TRAVEL_MODE: keyof typeof API_MODES = 'walking';
-
-const ROUTES_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
-
-const HORIZONTAL_PADDING = Spacing.four;
-const MAP_ASPECT_RATIO = 4 / 3;
-
-type Coords = { latitude: number; longitude: number };
-type RouteInfo = { duration: string; distance: string };
-
-function useCurrentLocation() {
-  const [coords, setCoords] = useState<Coords | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          if (!cancelled) setError('Location permission denied');
-          return;
-        }
-
-        const position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        if (!cancelled) setCoords(position.coords);
-      } catch {
-        if (!cancelled) setError('Could not get your location');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return { coords, error, loading };
-}
-
-function formatDuration(seconds: number) {
-  const totalMinutes = Math.max(1, Math.round(seconds / 60));
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return hours > 0 ? `${hours} hr ${minutes} min` : `${minutes} min`;
-}
-
-function formatDistance(meters: number) {
-  return meters >= 1000
-    ? `${(meters / 1000).toFixed(1)} km`
-    : `${Math.round(meters)} m`;
-}
-
-function useRouteInfo(origin: Coords | null) {
-  const [info, setInfo] = useState<RouteInfo | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!origin) return;
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const response = await fetch(ROUTES_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Goog-Api-Key': MAPS_API_KEY ?? '',
-            // Only request the fields we need (keeps the request cheaper)
-            'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters',
-          },
-          body: JSON.stringify({
-            origin: {
-              location: {
-                latLng: {
-                  latitude: origin.latitude,
-                  longitude: origin.longitude,
-                },
-              },
-            },
-            destination: { address: DESTINATION },
-            travelMode: API_MODES[TRAVEL_MODE],
-            // Live traffic only applies to driving
-            ...(TRAVEL_MODE === 'driving' && {
-              routingPreference: 'TRAFFIC_AWARE',
-            }),
-          }),
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data?.error?.message ?? 'Route request failed');
-        }
-
-        const route = data.routes?.[0];
-        if (!route) throw new Error('No route found');
-
-        // duration comes back as a string like "1234s"
-        const seconds = parseInt(route.duration, 10);
-        if (!cancelled) {
-          setInfo({
-            duration: formatDuration(seconds),
-            distance: formatDistance(route.distanceMeters ?? 0),
-          });
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'Could not get route info');
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // Depend on primitives so the effect doesn't re-run on every render
-  }, [origin?.latitude, origin?.longitude]);
-
-  return { info, error };
-}
-
-function buildMapUrl(origin: Coords | null) {
-  const destination = encodeURIComponent(DESTINATION);
-
-  // No location yet (or denied): just show the destination
-  if (!origin) {
-    return `https://www.google.com/maps/embed/v1/place?key=${MAPS_API_KEY}&q=${destination}`;
-  }
-
-  return (
-    `https://www.google.com/maps/embed/v1/directions?key=${MAPS_API_KEY}` +
-    `&origin=${origin.latitude},${origin.longitude}` +
-    `&destination=${destination}` +
-    `&mode=${TRAVEL_MODE}`
+export default function HomeScreen() {
+  const defaults = getDefaultSearchCriteria();
+  const theme = useTheme();
+  const [location, setLocation] = useState(defaults.location);
+  const [transport, setTransport] = useState<Transport>(defaults.transport);
+  const [openNow, setOpenNow] = useState(defaults.openNow);
+  const [maximumTravelTime, setMaximumTravelTime] = useState<TravelTime>(
+    defaults.maximumTravelTime
   );
-}
+  const [eatingPreferences, setEatingPreferences] = useState<EatingPreference[]>(
+    defaults.eatingPreferences
+  );
+  const [requiredDietary, setRequiredDietary] = useState<DietaryRestriction[]>(
+    defaults.requiredDietary
+  );
+  const [preferredDietary, setPreferredDietary] = useState<DietaryRestriction[]>(
+    defaults.preferredDietary
+  );
+  const [allergies, setAllergies] = useState<Allergen[]>(defaults.allergies);
+  const [isDietaryExpanded, setIsDietaryExpanded] = useState(false);
+  const [isAllergyExpanded, setIsAllergyExpanded] = useState(false);
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
+  function toggleEatingPreference(preference: EatingPreference) {
+    setEatingPreferences((current) => {
+      if (current.includes(preference)) {
+        return current.length === 1 ? current : current.filter((item) => item !== preference);
+      }
+
+      return [...current, preference];
+    });
   }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
+
+  function getDietarySelection(restriction: DietaryRestriction) {
+    if (requiredDietary.includes(restriction)) {
+      return 'Required';
+    }
+
+    if (preferredDietary.includes(restriction)) {
+      return 'Preferred';
+    }
+
+    return undefined;
+  }
+
+  function setDietarySelection(
+    restriction: DietaryRestriction,
+    selection: 'Required' | 'Preferred' | undefined
+  ) {
+    setRequiredDietary((current) =>
+      selection === 'Required'
+        ? [...new Set([...current, restriction])]
+        : current.filter((item) => item !== restriction)
+    );
+    setPreferredDietary((current) =>
+      selection === 'Preferred'
+        ? [...new Set([...current, restriction])]
+        : current.filter((item) => item !== restriction)
     );
   }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+
+  function toggleAllergy(allergen: Allergen) {
+    setAllergies((current) =>
+      current.includes(allergen)
+        ? current.filter((item) => item !== allergen)
+        : [...current, allergen]
+    );
+  }
+
+  function showRecommendations() {
+    router.push({
+      pathname: '/results',
+      params: {
+        location: location.trim() || defaults.location,
+        transport,
+        openNow: String(openNow),
+        maximumTravelTime: String(maximumTravelTime),
+        eatingPreferences: eatingPreferences.join(','),
+        requiredDietary: requiredDietary.join(','),
+        preferredDietary: preferredDietary.join(','),
+        allergies: allergies.join(','),
+      },
+    } as never);
+  }
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
+    <ThemedView style={styles.container}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}>
+            <View style={styles.heading}>
+              <ThemedText type="title" style={styles.brandTitle} themeColor="accent">
+                WATsForLunch
+              </ThemedText>
+              <ThemedText style={styles.intro} themeColor="textSecondary">
+                The intelligent decision layer between you and your next meal
+              </ThemedText>
+            </View>
+
+            <View style={styles.form}>
+              <FieldLabel label="Where are you?" />
+              <TextInput
+                accessibilityLabel="Location"
+                autoCapitalize="characters"
+                onChangeText={setLocation}
+                placeholder="MC, STC, or another building"
+                placeholderTextColor={theme.textSecondary}
+                selectionColor={theme.accent}
+                style={[
+                  styles.locationInput,
+                  {
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.border,
+                    color: theme.text,
+                  },
+                ]}
+                value={location}
+              />
+
+              <FieldLabel label="How are you getting there?" />
+              <OptionRow>
+                {transportOptions.map((option) => (
+                  <OptionButton
+                    key={option}
+                    label={option}
+                    onPress={() => setTransport(option)}
+                    selected={transport === option}
+                  />
+                ))}
+              </OptionRow>
+
+              <FieldLabel label="Only show places open now?" />
+              <OptionRow>
+                <OptionButton label="Yes" onPress={() => setOpenNow(true)} selected={openNow} />
+                <OptionButton label="No" onPress={() => setOpenNow(false)} selected={!openNow} />
+              </OptionRow>
+
+              <FieldLabel label="Maximum travel time" />
+              <OptionRow>
+                {travelTimeOptions.map((minutes) => (
+                  <OptionButton
+                    key={minutes}
+                    label={`${minutes} min`}
+                    onPress={() => setMaximumTravelTime(minutes)}
+                    selected={maximumTravelTime === minutes}
+                  />
+                ))}
+              </OptionRow>
+
+              <OptionalPreferenceSection
+                expanded={isDietaryExpanded}
+                onToggle={() => setIsDietaryExpanded((current) => !current)}
+                title="Dietary restrictions">
+                <ThemedText type="small" themeColor="textSecondary">
+                  Choose one priority per restriction. Required restrictions filter results; preferred
+                  restrictions improve their rank.
+                </ThemedText>
+                <DietaryPreferenceList
+                  getSelection={getDietarySelection}
+                  onChange={setDietarySelection}
+                  options={dietaryRestrictionOptions}
+                />
+              </OptionalPreferenceSection>
+
+              <OptionalPreferenceSection
+                expanded={isAllergyExpanded}
+                onToggle={() => setIsAllergyExpanded((current) => !current)}
+                title="Allergies">
+                <ThemedText type="small" themeColor="textSecondary">
+                  Allergy selections are always required. We remove meals with a listed allergen or
+                  cross-contact warning.
+                </ThemedText>
+                <SelectionChipGroup
+                  accessibilityLabel="Allergies"
+                  onToggle={toggleAllergy}
+                  options={allergyOptions}
+                  selected={allergies}
+                />
+              </OptionalPreferenceSection>
+
+              <FieldLabel label="What are you in the mood for? Select all that apply." />
+              <View style={styles.preferenceOptions}>
+                {eatingPreferenceOptions.map((option) => (
+                  <OptionButton
+                    healthPreference={option}
+                    key={option}
+                    label={option}
+                    multiSelect
+                    onPress={() => toggleEatingPreference(option)}
+                    selected={eatingPreferences.includes(option)}
+                    wide
+                  />
+                ))}
+              </View>
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={showRecommendations}
+              style={({ pressed }) => [
+                styles.submitButton,
+                { backgroundColor: theme.accent },
+                pressed && styles.pressed,
+              ]}>
+              <ThemedText style={[styles.submitLabel, { color: theme.background }]}>
+                Let&apos;s eat!
+              </ThemedText>
+            </Pressable>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </ThemedView>
   );
 }
 
-function GoogleMapEmbed() {
-  const { width } = useWindowDimensions();
-  const { coords, error, loading } = useCurrentLocation();
-  const { info, error: routeError } = useRouteInfo(coords);
-  const mapUrl = buildMapUrl(coords);
+function FieldLabel({ label }: { label: string }) {
+  return <ThemedText style={styles.fieldLabel}>{label}</ThemedText>;
+}
+
+function OptionalPreferenceSection({
+  children,
+  expanded,
+  onToggle,
+  title,
+}: {
+  children: ReactNode;
+  expanded: boolean;
+  onToggle: () => void;
+  title: string;
+}) {
+  const theme = useTheme();
 
   return (
-    <View
-      style={[
-        styles.mapWrapper,
-        { maxWidth: Math.min(MaxContentWidth, width - HORIZONTAL_PADDING * 2) },
-      ]}>
-      <View style={styles.mapContainer}>
-        {Platform.OS === 'web' ? (
-          // createElement avoids TypeScript complaining about <iframe> in React Native
-          createElement('iframe', {
-            title: 'Google Map',
-            width: '100%',
-            height: '100%',
-            frameBorder: 0,
-            style: { border: 0 },
-            referrerPolicy: 'strict-origin-when-cross-origin',
-            allowFullScreen: true,
-            src: mapUrl,
-          })
-        ) : (
-          // key forces a reload when the URL changes (location arrives)
-          <WebView key={mapUrl} source={{ uri: mapUrl }} style={styles.map} />
-        )}
-      </View>
-
-      {loading && <ThemedText type="small">Getting your location…</ThemedText>}
-      {error && (
-        <ThemedText type="small">
-          {error}. Showing the destination only.
-        </ThemedText>
-      )}
-
-      {info && (
-        <View style={styles.routeInfo}>
-          <ThemedText type="subtitle">{info.duration}</ThemedText>
-          <ThemedText type="small">
-            {info.distance} by {TRAVEL_MODE} to {DESTINATION}
+    <View style={styles.preferenceSection}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        onPress={onToggle}
+        style={({ pressed }) => [
+          styles.optionalHeader,
+          { backgroundColor: 'transparent', borderWidth: 0 },
+          pressed && styles.pressed,
+        ]}>
+        <View style={styles.optionalHeaderText}>
+          <ThemedText style={styles.optionalTitle}>{title}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            Optional
           </ThemedText>
         </View>
-      )}
-      {routeError && <ThemedText type="small">{routeError}</ThemedText>}
+        <ThemedText style={[styles.optionalChevron, { color: theme.textSecondary }]}>
+          {expanded ? '⌃' : '⌄'}
+        </ThemedText>
+      </Pressable>
+      {expanded ? <View style={styles.optionalContent}>{children}</View> : null}
     </View>
   );
 }
 
-export default function HomeScreen() {
+function OptionRow({ children }: { children: ReactNode }) {
+  return <View style={styles.optionRow}>{children}</View>;
+}
+
+type OptionButtonProps = {
+  label: string;
+  onPress: () => void;
+  selected: boolean;
+  wide?: boolean;
+  multiSelect?: boolean;
+  healthPreference?: EatingPreference;
+};
+
+function OptionButton({
+  label,
+  onPress,
+  selected,
+  wide = false,
+  multiSelect = false,
+  healthPreference,
+}: OptionButtonProps) {
+  const theme = useTheme();
+  const selectedColors = getSelectedOptionColors(healthPreference, theme);
+
   return (
-    <ThemedView style={styles.container}>
-      <GoogleMapEmbed />
-    </ThemedView>
+    <Pressable
+      accessibilityRole={multiSelect ? 'checkbox' : 'radio'}
+      accessibilityState={multiSelect ? { checked: selected } : { selected }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.optionButton,
+        wide && styles.wideOptionButton,
+        {
+          backgroundColor: selected ? selectedColors.backgroundColor : theme.backgroundElement,
+          borderColor: selected ? selectedColors.borderColor : theme.border,
+        },
+        pressed && styles.pressed,
+      ]}>
+      <ThemedText
+        type="smallBold"
+        style={{ color: selected ? selectedColors.textColor : theme.textSecondary }}>
+        {label}
+      </ThemedText>
+    </Pressable>
   );
+}
+
+function getSelectedOptionColors(
+  preference: EatingPreference | undefined,
+  theme: ReturnType<typeof useTheme>
+) {
+  if (preference === 'Kinda Healthy') {
+    return {
+      backgroundColor: theme.kindaHealthySoft,
+      borderColor: theme.kindaHealthy,
+      textColor: theme.kindaHealthy,
+    };
+  }
+
+  if (preference === 'Unhealthy') {
+    return {
+      backgroundColor: theme.unhealthySoft,
+      borderColor: theme.unhealthy,
+      textColor: theme.unhealthyText,
+    };
+  }
+
+  return {
+    backgroundColor: theme.accentSoft,
+    borderColor: theme.accent,
+    textColor: theme.accent,
+  };
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
-    paddingHorizontal: HORIZONTAL_PADDING,
-  },
-  mapWrapper: {
-    width: '100%',
-    gap: Spacing.three,
-  },
-  mapContainer: {
-    width: '100%',
-    aspectRatio: MAP_ASPECT_RATIO,
-    overflow: 'hidden',
-  },
-  map: {
-    flex: 1,
-  },
-  routeInfo: {
-    gap: Spacing.one,
   },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
+    alignSelf: 'center',
+    width: '100%',
     maxWidth: MaxContentWidth,
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  keyboardAvoidingView: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    paddingTop: Spacing.five,
+    paddingBottom: Spacing.five,
+    gap: Spacing.five,
   },
-  title: {
-    textAlign: 'center',
+  heading: {
+    gap: Spacing.two,
   },
-  code: {
-    textTransform: 'uppercase',
+  brandTitle: {
+    fontSize: 44,
+    fontWeight: 800,
+    letterSpacing: -1.2,
+    lineHeight: 48,
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
+  intro: {
+    maxWidth: 360,
+  },
+  form: {
+    gap: Spacing.two,
+  },
+  fieldLabel: {
+    marginTop: Spacing.two,
+    fontWeight: 700,
+  },
+  preferenceSection: {
+    gap: Spacing.two,
+    marginTop: Spacing.two,
+  },
+  optionalHeader: {
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: Spacing.three,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 0,
+    paddingVertical: 13,
+  },
+  optionalHeaderText: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  optionalTitle: {
+    fontWeight: 700,
+  },
+  optionalChevron: {
+    fontSize: 18,
+    fontWeight: 700,
+  },
+  optionalContent: {
+    gap: Spacing.two,
+  },
+  locationInput: {
+    borderWidth: 1,
+    borderRadius: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+    paddingVertical: 13,
+    fontSize: 16,
+    fontWeight: 500,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+  },
+  preferenceOptions: {
+    gap: Spacing.two,
+  },
+  optionButton: {
+    borderWidth: 1,
+    borderRadius: Spacing.five,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  wideOptionButton: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  submitButton: {
+    alignItems: 'center',
+    borderRadius: Spacing.three,
+    paddingVertical: Spacing.three,
+  },
+  submitLabel: {
+    fontWeight: 800,
+  },
+  pressed: {
+    opacity: 0.78,
   },
 });
