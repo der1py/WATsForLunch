@@ -1,6 +1,7 @@
 import * as Device from 'expo-device';
-import { createElement } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import * as Location from 'expo-location';
+import { createElement, useEffect, useState } from 'react';
+import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import { ThemedText } from '@/components/themed-text';
@@ -10,9 +11,53 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 // Put your key in .env as EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
 const MAPS_API_KEY = "AIzaSyCaw-3AmYYNY62_tZVajsjQccuFDm_yrMQ";
 
-// MAP_MODE -> place | view | directions | streetview | search
-// PARAMETERS -> depends on the mode, e.g. q=... for place/search
-const MAP_URL = `https://www.google.com/maps/embed/v1/place?key=${MAPS_API_KEY}&q=Space+Needle,Seattle+WA`;
+const FALLBACK_QUERY = 'University of Waterloo, Waterloo, ON';
+const HORIZONTAL_PADDING = Spacing.four;
+const MAP_ASPECT_RATIO = 4 / 3;
+
+type Coords = { latitude: number; longitude: number };
+
+function useCurrentLocation() {
+  const [coords, setCoords] = useState<Coords | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          if (!cancelled) setError('Location permission denied');
+          return;
+        }
+
+        const position = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (!cancelled) setCoords(position.coords);
+      } catch {
+        if (!cancelled) setError('Could not get your location');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { coords, error, loading };
+}
+
+function buildMapUrl(coords: Coords | null) {
+  const query = coords
+    ? `${coords.latitude},${coords.longitude}`
+    : encodeURIComponent(FALLBACK_QUERY);
+  return `https://www.google.com/maps/embed/v1/place?key=${MAPS_API_KEY}&q=${query}&zoom=15`;
+}
 
 function getDevMenuHint() {
   if (Platform.OS === 'web') {
@@ -34,22 +79,37 @@ function getDevMenuHint() {
 }
 
 function GoogleMapEmbed() {
+  const { width } = useWindowDimensions();
+  const { coords, error, loading } = useCurrentLocation();
+  const mapUrl = buildMapUrl(coords);
+
   return (
-    <View style={styles.mapContainer}>
-      {Platform.OS === 'web' ? (
-        // createElement avoids TypeScript complaining about <iframe> in React Native
-        createElement('iframe', {
-          title: 'Google Map',
-          width: '100%',
-          height: '100%',
-          frameBorder: 0,
-          style: { border: 0 },
-          referrerPolicy: 'strict-origin-when-cross-origin',
-          allowFullScreen: true,
-          src: MAP_URL,
-        })
-      ) : (
-        <WebView source={{ uri: MAP_URL }} style={styles.map} />
+    <View
+      style={[
+        styles.mapWrapper,
+        { maxWidth: Math.min(MaxContentWidth, width - HORIZONTAL_PADDING * 2) },
+      ]}>
+      <View style={styles.mapContainer}>
+        {Platform.OS === 'web' ? (
+          // createElement avoids TypeScript complaining about <iframe> in React Native
+          createElement('iframe', {
+            title: 'Google Map',
+            width: '100%',
+            height: '100%',
+            frameBorder: 0,
+            style: { border: 0 },
+            referrerPolicy: 'strict-origin-when-cross-origin',
+            allowFullScreen: true,
+            src: mapUrl,
+          })
+        ) : (
+          <WebView source={{ uri: mapUrl }} style={styles.map} />
+        )}
+      </View>
+
+      {loading && <ThemedText type="small">Getting your location…</ThemedText>}
+      {error && (
+        <ThemedText type="small">{error}. Showing University of Waterloo instead.</ThemedText>
       )}
     </View>
   );
@@ -69,11 +129,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
+    paddingHorizontal: HORIZONTAL_PADDING,
+  },
+  mapWrapper: {
+    width: '100%',
+    gap: Spacing.three,
   },
   mapContainer: {
     width: '100%',
-    maxWidth: 450,
-    height: 250,
+    aspectRatio: MAP_ASPECT_RATIO,
     overflow: 'hidden',
   },
   map: {
