@@ -85,5 +85,5 @@ export async function getMenuItem(
     if (!menuItem) {
         return undefined;
     }
-    return { ...menuItem, restaurant: restaurantName };
+    return { ...menuItem, restaurant: restaurantName, averageHealthScore: menuItem.healthScore };
 }
