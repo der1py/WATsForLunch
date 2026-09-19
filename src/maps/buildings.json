@@ -1,0 +1,20 @@
+[
+  {
+    "id": "rev",
+    "name": "REVelation (REV)",
+    "latitude": 43.470461699663716,
+    "longitude": -80.55404734840796
+  },
+  {
+    "id": "v1",
+    "name": "Mudie's (V1)",
+    "latitude": 43.47198612224392,
+    "longitude": -80.55022301772749
+  },
+  {
+    "id": "cmh",
+    "name": "The Market (CMH)",
+    "latitude": 43.47057785798721,
+    "longitude": -80.53614032937703
+  }
+]

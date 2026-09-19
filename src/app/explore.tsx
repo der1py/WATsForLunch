@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
+import { useEffect, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,14 +11,29 @@ import { Collapsible } from '@/components/ui/collapsible';
 import { WebBadge } from '@/components/web-badge';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { currentLocationToCaf } from '@/maps/walkingTimes';
 
 export default function TabTwoScreen() {
   const safeAreaInsets = useSafeAreaInsets();
+  const [walkingTimesData, setWalkingTimesData] = useState(null);
+  const [error, setError] = useState(null);
   const insets = {
     ...safeAreaInsets,
     bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
   };
   const theme = useTheme();
+
+  useEffect(() => {
+    currentLocationToCaf()
+      .then((result) => {
+        setWalkingTimesData(result);
+        console.log('Walking times result:', result);
+      })
+      .catch((err: any) => {
+        setError(err.message);
+        console.error('Walking times error:', err);
+      });
+  }, []);
 
   const contentPlatformStyle = Platform.select({
     android: {
@@ -40,9 +56,23 @@ export default function TabTwoScreen() {
       <ThemedView style={styles.container}>
         <ThemedView style={styles.titleContainer}>
           <ThemedText type="subtitle">Explore</ThemedText>
-          <ThemedText style={styles.centerText} themeColor="textSecondary">
-            This starter app includes example{'\n'}code to help you get started.
-          </ThemedText>
+          {walkingTimesData && (
+            <ThemedText style={styles.centerText}>
+              Walking Times:
+              {'\n'}
+              {JSON.stringify(walkingTimesData, null, 2)}
+            </ThemedText>
+          )}
+          {error && (
+            <ThemedText style={[styles.centerText, { color: 'red' }]}>
+              Error: {error}
+            </ThemedText>
+          )}
+          {!walkingTimesData && !error && (
+            <ThemedText style={styles.centerText} themeColor="textSecondary">
+              Loading walking times...
+            </ThemedText>
+          )}
 
           <ExternalLink href="https://docs.expo.dev" asChild>
             <Pressable style={({ pressed }) => pressed && styles.pressed}>
