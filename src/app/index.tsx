@@ -1,13 +1,18 @@
 import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { createElement } from 'react';
+import { Platform, StyleSheet, View } from 'react-native';
+import { WebView } from 'react-native-webview';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+
+// Put your key in .env as EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
+const MAPS_API_KEY = "AIzaSyCaw-3AmYYNY62_tZVajsjQccuFDm_yrMQ";
+
+// MAP_MODE -> place | view | directions | streetview | search
+// PARAMETERS -> depends on the mode, e.g. q=... for place/search
+const MAP_URL = `https://www.google.com/maps/embed/v1/place?key=${MAPS_API_KEY}&q=Space+Needle,Seattle+WA`;
 
 function getDevMenuHint() {
   if (Platform.OS === 'web') {
@@ -28,35 +33,32 @@ function getDevMenuHint() {
   );
 }
 
+function GoogleMapEmbed() {
+  return (
+    <View style={styles.mapContainer}>
+      {Platform.OS === 'web' ? (
+        // createElement avoids TypeScript complaining about <iframe> in React Native
+        createElement('iframe', {
+          title: 'Google Map',
+          width: '100%',
+          height: '100%',
+          frameBorder: 0,
+          style: { border: 0 },
+          referrerPolicy: 'strict-origin-when-cross-origin',
+          allowFullScreen: true,
+          src: MAP_URL,
+        })
+      ) : (
+        <WebView source={{ uri: MAP_URL }} style={styles.map} />
+      )}
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
+      <GoogleMapEmbed />
     </ThemedView>
   );
 }
@@ -65,7 +67,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
     flexDirection: 'row',
+  },
+  mapContainer: {
+    width: '100%',
+    maxWidth: 450,
+    height: 250,
+    overflow: 'hidden',
+  },
+  map: {
+    flex: 1,
   },
   safeArea: {
     flex: 1,
