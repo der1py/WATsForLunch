@@ -9,9 +9,12 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 
 // Put your key in .env as EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
-const MAPS_API_KEY = "AIzaSyCaw-3AmYYNY62_tZVajsjQccuFDm_yrMQ";
+const MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
-const FALLBACK_QUERY = 'University of Waterloo, Waterloo, ON';
+const DESTINATION = 'Shawarma Hub, Waterloo, ON';
+// driving | walking | bicycling | transit | flying
+const TRAVEL_MODE = 'walking';
+
 const HORIZONTAL_PADDING = Spacing.four;
 const MAP_ASPECT_RATIO = 4 / 3;
 
@@ -52,11 +55,20 @@ function useCurrentLocation() {
   return { coords, error, loading };
 }
 
-function buildMapUrl(coords: Coords | null) {
-  const query = coords
-    ? `${coords.latitude},${coords.longitude}`
-    : encodeURIComponent(FALLBACK_QUERY);
-  return `https://www.google.com/maps/embed/v1/place?key=${MAPS_API_KEY}&q=${query}&zoom=15`;
+function buildMapUrl(origin: Coords | null) {
+  const destination = encodeURIComponent(DESTINATION);
+
+  // No location yet (or denied): just show the destination
+  if (!origin) {
+    return `https://www.google.com/maps/embed/v1/place?key=${MAPS_API_KEY}&q=${destination}`;
+  }
+
+  return (
+    `https://www.google.com/maps/embed/v1/directions?key=${MAPS_API_KEY}` +
+    `&origin=${origin.latitude},${origin.longitude}` +
+    `&destination=${destination}` +
+    `&mode=${TRAVEL_MODE}`
+  );
 }
 
 function getDevMenuHint() {
@@ -103,13 +115,16 @@ function GoogleMapEmbed() {
             src: mapUrl,
           })
         ) : (
-          <WebView source={{ uri: mapUrl }} style={styles.map} />
+          // key forces a reload when the URL changes (location arrives)
+          <WebView key={mapUrl} source={{ uri: mapUrl }} style={styles.map} />
         )}
       </View>
 
       {loading && <ThemedText type="small">Getting your location…</ThemedText>}
       {error && (
-        <ThemedText type="small">{error}. Showing University of Waterloo instead.</ThemedText>
+        <ThemedText type="small">
+          {error}. Showing the destination only.
+        </ThemedText>
       )}
     </View>
   );
