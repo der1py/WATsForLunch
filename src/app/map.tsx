@@ -1,19 +1,19 @@
-import * as Device from 'expo-device';
 import * as Location from 'expo-location';
+import { router, useLocalSearchParams } from 'expo-router';
 import { createElement, useEffect, useState } from 'react';
-import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
-// Put your key in .env as EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
 const MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+const ROUTES_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
+const MAP_ASPECT_RATIO = 4 / 3;
 
-const DESTINATION = 'Shawarma Hub, Waterloo, ON';
-
-// Embed API mode -> Routes API mode
 const API_MODES = {
   driving: 'DRIVE',
   walking: 'WALK',
@@ -22,13 +22,36 @@ const API_MODES = {
 } as const;
 const TRAVEL_MODE: keyof typeof API_MODES = 'walking';
 
-const ROUTES_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
-
-const HORIZONTAL_PADDING = Spacing.four;
-const MAP_ASPECT_RATIO = 4 / 3;
+const DEFAULT_DESTINATION = {
+  name: 'Shawarma Hub',
+  address: 'Waterloo, ON',
+  latitude: 43.4723,
+  longitude: -80.5449,
+};
 
 type Coords = { latitude: number; longitude: number };
 type RouteInfo = { duration: string; distance: string };
+type MapDestination = Coords & { name: string; address: string };
+
+function getFirstParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function getCoordinate(value: string | undefined, fallback: number) {
+  const coordinate = Number(value);
+  return Number.isFinite(coordinate) ? coordinate : fallback;
+}
+
+function getMapDestination(
+  params: Record<string, string | string[] | undefined>
+): MapDestination {
+  return {
+    name: getFirstParam(params.name)?.trim() || DEFAULT_DESTINATION.name,
+    address: getFirstParam(params.address)?.trim() || DEFAULT_DESTINATION.address,
+    latitude: getCoordinate(getFirstParam(params.latitude), DEFAULT_DESTINATION.latitude),
+    longitude: getCoordinate(getFirstParam(params.longitude), DEFAULT_DESTINATION.longitude),
+  };
+}
 
 function useCurrentLocation() {
   const [coords, setCoords] = useState<Coords | null>(null);
@@ -78,12 +101,14 @@ function formatDistance(meters: number) {
     : `${Math.round(meters)} m`;
 }
 
-function useRouteInfo(origin: Coords | null) {
+function useRouteInfo(origin: Coords | null, destination: MapDestination) {
   const [info, setInfo] = useState<RouteInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const originLatitude = origin?.latitude;
+  const originLongitude = origin?.longitude;
 
   useEffect(() => {
-    if (!origin) return;
+    if (originLatitude === undefined || originLongitude === undefined) return;
     let cancelled = false;
 
     (async () => {
@@ -93,24 +118,26 @@ function useRouteInfo(origin: Coords | null) {
           headers: {
             'Content-Type': 'application/json',
             'X-Goog-Api-Key': MAPS_API_KEY ?? '',
-            // Only request the fields we need (keeps the request cheaper)
             'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters',
           },
           body: JSON.stringify({
             origin: {
               location: {
                 latLng: {
-                  latitude: origin.latitude,
-                  longitude: origin.longitude,
+                  latitude: originLatitude,
+                  longitude: originLongitude,
                 },
               },
             },
-            destination: { address: DESTINATION },
+            destination: {
+              location: {
+                latLng: {
+                  latitude: destination.latitude,
+                  longitude: destination.longitude,
+                },
+              },
+            },
             travelMode: API_MODES[TRAVEL_MODE],
-            // Live traffic only applies to driving
-            ...(TRAVEL_MODE === 'driving' && {
-              routingPreference: 'TRAFFIC_AWARE',
-            }),
           }),
         });
 
@@ -122,17 +149,15 @@ function useRouteInfo(origin: Coords | null) {
         const route = data.routes?.[0];
         if (!route) throw new Error('No route found');
 
-        // duration comes back as a string like "1234s"
-        const seconds = parseInt(route.duration, 10);
         if (!cancelled) {
           setInfo({
-            duration: formatDuration(seconds),
+            duration: formatDuration(parseInt(route.duration, 10)),
             distance: formatDistance(route.distanceMeters ?? 0),
           });
         }
-      } catch (e) {
+      } catch (cause) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'Could not get route info');
+          setError(cause instanceof Error ? cause.message : 'Could not get route info');
         }
       }
     })();
@@ -140,64 +165,49 @@ function useRouteInfo(origin: Coords | null) {
     return () => {
       cancelled = true;
     };
-    // Depend on primitives so the effect doesn't re-run on every render
-  }, [origin?.latitude, origin?.longitude]);
+  }, [destination.latitude, destination.longitude, originLatitude, originLongitude]);
 
   return { info, error };
 }
 
-function buildMapUrl(origin: Coords | null) {
-  const destination = encodeURIComponent(DESTINATION);
+function buildMapUrl(origin: Coords | null, destination: MapDestination) {
+  const destinationCoordinates = `${destination.latitude},${destination.longitude}`;
 
-  // No location yet (or denied): just show the destination
   if (!origin) {
-    return `https://www.google.com/maps/embed/v1/place?key=${MAPS_API_KEY}&q=${destination}`;
+    return `https://www.google.com/maps/embed/v1/place?key=${MAPS_API_KEY}&q=${encodeURIComponent(destinationCoordinates)}`;
   }
 
   return (
     `https://www.google.com/maps/embed/v1/directions?key=${MAPS_API_KEY}` +
     `&origin=${origin.latitude},${origin.longitude}` +
-    `&destination=${destination}` +
+    `&destination=${encodeURIComponent(destinationCoordinates)}` +
     `&mode=${TRAVEL_MODE}`
   );
 }
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
-
-function GoogleMapEmbed() {
-  const { width } = useWindowDimensions();
+function GoogleMapEmbed({ destination }: { destination: MapDestination }) {
+  const theme = useTheme();
   const { coords, error, loading } = useCurrentLocation();
-  const { info, error: routeError } = useRouteInfo(coords);
-  const mapUrl = buildMapUrl(coords);
+  const { info, error: routeError } = useRouteInfo(coords, destination);
+  const mapUrl = buildMapUrl(coords, destination);
 
   return (
     <View
       style={[
-        styles.mapWrapper,
-        { maxWidth: Math.min(MaxContentWidth, width - HORIZONTAL_PADDING * 2) },
+        styles.mapCard,
+        { backgroundColor: theme.backgroundElement, borderColor: theme.border },
       ]}>
+      <View style={styles.destinationDetails}>
+        <ThemedText type="subtitle">{destination.name}</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          {destination.address}
+        </ThemedText>
+      </View>
+
       <View style={styles.mapContainer}>
         {Platform.OS === 'web' ? (
-          // createElement avoids TypeScript complaining about <iframe> in React Native
           createElement('iframe', {
-            title: 'Google Map',
+            title: destination.name,
             width: '100%',
             height: '100%',
             frameBorder: 0,
@@ -207,35 +217,70 @@ function GoogleMapEmbed() {
             src: mapUrl,
           })
         ) : (
-          // key forces a reload when the URL changes (location arrives)
           <WebView key={mapUrl} source={{ uri: mapUrl }} style={styles.map} />
         )}
       </View>
 
-      {loading && <ThemedText type="small">Getting your location…</ThemedText>}
-      {error && (
-        <ThemedText type="small">
-          {error}. Showing the destination only.
-        </ThemedText>
-      )}
-
-      {info && (
-        <View style={styles.routeInfo}>
-          <ThemedText type="subtitle">{info.duration}</ThemedText>
-          <ThemedText type="small">
-            {info.distance} by {TRAVEL_MODE} to {DESTINATION}
-          </ThemedText>
+      {(loading || error || info || routeError) && (
+        <View style={styles.routeDetails}>
+          {loading && (
+            <ThemedText type="small" themeColor="textSecondary">
+              Getting your location…
+            </ThemedText>
+          )}
+          {error && (
+            <ThemedText type="small" themeColor="textSecondary">
+              {error}. Showing the destination only.
+            </ThemedText>
+          )}
+          {info && (
+            <View style={[styles.routeInfo, { backgroundColor: theme.accentSoft }]}>
+              <ThemedText type="smallBold" themeColor="accent">
+                {info.duration}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {info.distance} walk to {destination.name}
+              </ThemedText>
+            </View>
+          )}
+          {routeError && (
+            <ThemedText type="small" themeColor="textSecondary">
+              {routeError}
+            </ThemedText>
+          )}
         </View>
       )}
-      {routeError && <ThemedText type="small">{routeError}</ThemedText>}
     </View>
   );
 }
 
-export default function HomeScreen() {
+export default function MapScreen() {
+  const params = useLocalSearchParams();
+  const destination = getMapDestination(params);
+
   return (
     <ThemedView style={styles.container}>
-      <GoogleMapEmbed />
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <Pressable
+            accessibilityLabel="Back to results"
+            accessibilityRole="button"
+            hitSlop={Spacing.two}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/');
+              }
+            }}
+            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
+            <ThemedText style={styles.backArrow}>‹</ThemedText>
+            <ThemedText type="smallBold">Results</ThemedText>
+          </Pressable>
+
+          <GoogleMapEmbed destination={destination} />
+        </ScrollView>
+      </SafeAreaView>
     </ThemedView>
   );
 }
@@ -243,52 +288,56 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
-    paddingHorizontal: HORIZONTAL_PADDING,
   },
-  mapWrapper: {
+  safeArea: {
+    alignSelf: 'center',
+    flex: 1,
+    maxWidth: MaxContentWidth,
     width: '100%',
-    gap: Spacing.three,
+  },
+  scrollContent: {
+    gap: Spacing.five,
+    paddingBottom: Spacing.five,
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.three,
+  },
+  backButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    gap: Spacing.one,
+    marginLeft: -Spacing.one,
+  },
+  backArrow: {
+    fontSize: 30,
+    lineHeight: 26,
+  },
+  mapCard: {
+    borderRadius: Spacing.four,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  destinationDetails: {
+    gap: Spacing.half,
+    padding: Spacing.three,
   },
   mapContainer: {
-    width: '100%',
     aspectRatio: MAP_ASPECT_RATIO,
-    overflow: 'hidden',
+    width: '100%',
   },
   map: {
     flex: 1,
   },
+  routeDetails: {
+    gap: Spacing.two,
+    padding: Spacing.three,
+  },
   routeInfo: {
-    gap: Spacing.one,
+    borderRadius: Spacing.two,
+    gap: Spacing.half,
+    padding: Spacing.two,
   },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  pressed: {
+    opacity: 0.72,
   },
 });

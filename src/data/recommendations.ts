@@ -3,6 +3,11 @@ export const restaurantFixtures = [
     id: 'green-table',
     place: 'Green Table',
     travelTime: '6 min walk',
+    location: {
+      address: '200 University Avenue West, Waterloo, ON',
+      latitude: 43.4723,
+      longitude: -80.5449,
+    },
     meals: [
       {
         name: 'Harvest grain bowl',
@@ -31,6 +36,11 @@ export const restaurantFixtures = [
     id: 'market-kitchen',
     place: 'Market Kitchen',
     travelTime: '9 min walk',
+    location: {
+      address: '75 University Avenue West, Waterloo, ON',
+      latitude: 43.4701,
+      longitude: -80.5431,
+    },
     meals: [
       {
         name: 'Salmon poke bowl',
@@ -59,6 +69,11 @@ export const restaurantFixtures = [
     id: 'corner-noodle',
     place: 'Corner Noodle',
     travelTime: '12 min walk',
+    location: {
+      address: '140 University Avenue West, Waterloo, ON',
+      latitude: 43.4689,
+      longitude: -80.5456,
+    },
     meals: [
       {
         name: 'Ginger tofu noodle soup',
@@ -87,6 +102,11 @@ export const restaurantFixtures = [
     id: 'cedar-grill',
     place: 'Cedar Grill',
     travelTime: '14 min walk',
+    location: {
+      address: '50 University Avenue West, Waterloo, ON',
+      latitude: 43.4675,
+      longitude: -80.5418,
+    },
     meals: [
       {
         name: 'Falafel plate',

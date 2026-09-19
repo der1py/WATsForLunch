@@ -42,10 +42,17 @@ export type MealRecommendation = {
   healthTag: HealthTag;
 };
 
+export type PlaceLocation = {
+  address: string;
+  latitude: number;
+  longitude: number;
+};
+
 export type PlaceRecommendation = {
   id: string;
   place: string;
   travelTime: string;
+  location: PlaceLocation;
   meals: MealRecommendation[];
 };
 
@@ -106,6 +113,10 @@ export function getTopRecommendations(criteria: SearchCriteria): PlaceRecommenda
       id: place.id,
       place: place.place,
       travelTime: place.travelTime,
+      // Ranked results originate from these fixtures, so a matching location always exists.
+      location: {
+        ...restaurantFixtures.find((fixture) => fixture.id === place.id)!.location,
+      },
       meals: place.meals.map(({ name, description, healthTag }) => ({
         name,
         description,
