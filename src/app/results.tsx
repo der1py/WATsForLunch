@@ -16,14 +16,6 @@ import {
 } from '@/services/recommendations';
 
 export default function ResultsScreen() {
-  const buildings = [
-    "EV3 Evergreen Cafe",
-    "ML Diner",
-    "REVelation",
-    "Mudie's",
-    "The Market at CMH",
-    "South Side Marketplace",
-  ];
   const params = useLocalSearchParams();
   const criteria = getSearchCriteriaFromParams(params);
   const recommendations = getTopRecommendations(criteria);
