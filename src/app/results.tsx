@@ -1,7 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -101,8 +100,7 @@ function PlaceCard({ recommendation, rank, expanded, onToggle }: PlaceCardProps)
   const theme = useTheme();
 
   return (
-    <Animated.View
-      layout={LinearTransition.duration(220)}
+    <View
       style={[
         styles.placeCard,
         { backgroundColor: theme.backgroundElement, borderColor: theme.border },
@@ -132,16 +130,14 @@ function PlaceCard({ recommendation, rank, expanded, onToggle }: PlaceCardProps)
         <ThemedText style={[styles.chevron, { color: theme.accent }]}>{expanded ? '⌃' : '⌄'}</ThemedText>
       </Pressable>
 
-      {expanded && (
-        <ExpandableContent>
-          <View style={[styles.mealList, { borderTopColor: theme.border }]}>
-            {recommendation.meals.map((meal) => (
-              <MealRow key={meal.name} meal={meal} />
-            ))}
-          </View>
-        </ExpandableContent>
-      )}
-    </Animated.View>
+      <ExpandableContent expanded={expanded}>
+        <View style={[styles.mealList, { borderTopColor: theme.border }]}>
+          {recommendation.meals.map((meal) => (
+            <MealRow key={meal.name} meal={meal} />
+          ))}
+        </View>
+      </ExpandableContent>
+    </View>
   );
 }
 
