@@ -185,6 +185,25 @@ function buildMapUrl(origin: Coords | null, destination: MapDestination) {
   );
 }
 
+function buildMapEmbedHtml(mapUrl: string, title: string) {
+  const escapedTitle = title.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>html, body, iframe { border: 0; height: 100%; margin: 0; padding: 0; width: 100%; }</style>
+  </head>
+  <body>
+    <iframe
+      title="${escapedTitle}"
+      src="${mapUrl}"
+      allowfullscreen
+      referrerpolicy="strict-origin-when-cross-origin"></iframe>
+  </body>
+</html>`;
+}
+
 function GoogleMapEmbed({ destination }: { destination: MapDestination }) {
   const theme = useTheme();
   const { coords, error, loading } = useCurrentLocation();
@@ -217,7 +236,11 @@ function GoogleMapEmbed({ destination }: { destination: MapDestination }) {
             src: mapUrl,
           })
         ) : (
-          <WebView key={mapUrl} source={{ uri: mapUrl }} style={styles.map} />
+          <WebView
+            key={mapUrl}
+            source={{ html: buildMapEmbedHtml(mapUrl, destination.name) }}
+            style={styles.map}
+          />
         )}
       </View>
 
