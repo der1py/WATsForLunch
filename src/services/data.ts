@@ -5,6 +5,7 @@ export type MenuItem = Restaurant['menu_items'][number];
 
 export type MenuItemResult = MenuItem & {
     restaurant: string;
+    averageHealthScore: number;
 };
 
 export type MenuItemFilters = {
@@ -32,11 +33,14 @@ export async function getRestaurant(
 
 /**
  * Lists ALL menu items by filters; `restaurant`, `healthScore`, `dietaryRestrictions`, and `allergens`
+ * Also returns the average health score of all menu items that match the filters `averageHealthScore` for calculations
  */
 export async function listMenuItems(
     filters: MenuItemFilters = {},
 ): Promise<MenuItemResult[]> {
     const restaurants = await retrieveRestaurantData();
+    let totalHealthScore = 0;
+    let totalItems = 0;
 
     return restaurants.flatMap(({ restaurant, menu_items}) =>
         menu_items
@@ -56,10 +60,14 @@ export async function listMenuItems(
                     filters.allergens?.some((allergen: string) =>
                         (Object.values(item.allergens.contains).includes(allergen) || Object.values(item.allergens.may_contain).includes(allergen)),
                     );
-
+                
+                if (matchesRestaurant && matchesHealthScore && matchesDietaryRestrictions && matchesAllergens) {
+                    totalHealthScore += item.healthScore;
+                    totalItems++;
+                }
                 return matchesRestaurant && matchesHealthScore && matchesDietaryRestrictions && matchesAllergens;
             })
-            .map((item) => ({ ...item, restaurant })),
+            .map((item) => ({ ...item, restaurant, averageHealthScore: totalItems > 0 ? totalHealthScore / totalItems : 0 })),
     );
 }
 
