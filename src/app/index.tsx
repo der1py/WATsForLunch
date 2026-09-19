@@ -12,13 +12,23 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 const MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 const DESTINATION = 'Shawarma Hub, Waterloo, ON';
-// driving | walking | bicycling | transit | flying
-const TRAVEL_MODE = 'walking';
+
+// Embed API mode -> Routes API mode
+const API_MODES = {
+  driving: 'DRIVE',
+  walking: 'WALK',
+  bicycling: 'BICYCLE',
+  transit: 'TRANSIT',
+} as const;
+const TRAVEL_MODE: keyof typeof API_MODES = 'walking';
+
+const ROUTES_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
 
 const HORIZONTAL_PADDING = Spacing.four;
 const MAP_ASPECT_RATIO = 4 / 3;
 
 type Coords = { latitude: number; longitude: number };
+type RouteInfo = { duration: string; distance: string };
 
 function useCurrentLocation() {
   const [coords, setCoords] = useState<Coords | null>(null);
@@ -53,6 +63,87 @@ function useCurrentLocation() {
   }, []);
 
   return { coords, error, loading };
+}
+
+function formatDuration(seconds: number) {
+  const totalMinutes = Math.max(1, Math.round(seconds / 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours > 0 ? `${hours} hr ${minutes} min` : `${minutes} min`;
+}
+
+function formatDistance(meters: number) {
+  return meters >= 1000
+    ? `${(meters / 1000).toFixed(1)} km`
+    : `${Math.round(meters)} m`;
+}
+
+function useRouteInfo(origin: Coords | null) {
+  const [info, setInfo] = useState<RouteInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!origin) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const response = await fetch(ROUTES_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': MAPS_API_KEY ?? '',
+            // Only request the fields we need (keeps the request cheaper)
+            'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters',
+          },
+          body: JSON.stringify({
+            origin: {
+              location: {
+                latLng: {
+                  latitude: origin.latitude,
+                  longitude: origin.longitude,
+                },
+              },
+            },
+            destination: { address: DESTINATION },
+            travelMode: API_MODES[TRAVEL_MODE],
+            // Live traffic only applies to driving
+            ...(TRAVEL_MODE === 'driving' && {
+              routingPreference: 'TRAFFIC_AWARE',
+            }),
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data?.error?.message ?? 'Route request failed');
+        }
+
+        const route = data.routes?.[0];
+        if (!route) throw new Error('No route found');
+
+        // duration comes back as a string like "1234s"
+        const seconds = parseInt(route.duration, 10);
+        if (!cancelled) {
+          setInfo({
+            duration: formatDuration(seconds),
+            distance: formatDistance(route.distanceMeters ?? 0),
+          });
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Could not get route info');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Depend on primitives so the effect doesn't re-run on every render
+  }, [origin?.latitude, origin?.longitude]);
+
+  return { info, error };
 }
 
 function buildMapUrl(origin: Coords | null) {
@@ -93,6 +184,7 @@ function getDevMenuHint() {
 function GoogleMapEmbed() {
   const { width } = useWindowDimensions();
   const { coords, error, loading } = useCurrentLocation();
+  const { info, error: routeError } = useRouteInfo(coords);
   const mapUrl = buildMapUrl(coords);
 
   return (
@@ -126,6 +218,16 @@ function GoogleMapEmbed() {
           {error}. Showing the destination only.
         </ThemedText>
       )}
+
+      {info && (
+        <View style={styles.routeInfo}>
+          <ThemedText type="subtitle">{info.duration}</ThemedText>
+          <ThemedText type="small">
+            {info.distance} by {TRAVEL_MODE} to {DESTINATION}
+          </ThemedText>
+        </View>
+      )}
+      {routeError && <ThemedText type="small">{routeError}</ThemedText>}
     </View>
   );
 }
@@ -157,6 +259,9 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  routeInfo: {
+    gap: Spacing.one,
   },
   safeArea: {
     flex: 1,
