@@ -5,7 +5,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { ExpandableContent } from '@/components/ui/expandable-content';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -130,13 +129,13 @@ function PlaceCard({ recommendation, rank, expanded, onToggle }: PlaceCardProps)
         <ThemedText style={[styles.chevron, { color: theme.accent }]}>{expanded ? '⌃' : '⌄'}</ThemedText>
       </Pressable>
 
-      <ExpandableContent expanded={expanded}>
+      {expanded ? (
         <View style={[styles.mealList, { borderTopColor: theme.border }]}>
           {recommendation.meals.map((meal) => (
             <MealRow key={meal.name} meal={meal} />
           ))}
         </View>
-      </ExpandableContent>
+      ) : null}
     </View>
   );
 }

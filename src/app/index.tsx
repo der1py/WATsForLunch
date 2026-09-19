@@ -15,7 +15,6 @@ import { DietaryPreferenceList } from '@/components/dietary-preference-list';
 import { SelectionChipGroup } from '@/components/selection-chip-group';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { ExpandableContent } from '@/components/ui/expandable-content';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -289,9 +288,7 @@ function OptionalPreferenceSection({
           {expanded ? '⌃' : '⌄'}
         </ThemedText>
       </Pressable>
-      <ExpandableContent expanded={expanded}>
-        <View style={styles.optionalContent}>{children}</View>
-      </ExpandableContent>
+      {expanded ? <View style={styles.optionalContent}>{children}</View> : null}
     </View>
   );
 }
