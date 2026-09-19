@@ -1,10 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { ExpandableContent } from '@/components/ui/expandable-content';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -31,7 +33,13 @@ export default function ResultsScreen() {
             accessibilityRole="button"
             accessibilityLabel="Back to search"
             hitSlop={Spacing.two}
-            onPress={() => router.back()}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/');
+              }
+            }}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
             <ThemedText style={styles.backArrow}>‹</ThemedText>
             <ThemedText type="smallBold">Edit search</ThemedText>
@@ -43,8 +51,22 @@ export default function ResultsScreen() {
             </ThemedText>
             <ThemedText type="subtitle">Lunch near {criteria.location}</ThemedText>
             <ThemedText style={styles.summary} themeColor="textSecondary">
-              {criteria.transport} · up to {criteria.maximumTravelTime} min · {criteria.eatingPreference}
+              {criteria.transport} · up to {criteria.maximumTravelTime} min ·{' '}
+              {criteria.eatingPreferences.join(' + ')}
             </ThemedText>
+            {(criteria.requiredDietary.length > 0 || criteria.preferredDietary.length > 0) && (
+              <ThemedText style={styles.summary} themeColor="textSecondary">
+                {[
+                  ...criteria.requiredDietary.map((restriction) => `${restriction} required`),
+                  ...criteria.preferredDietary.map((restriction) => `${restriction} preferred`),
+                ].join(' · ')}
+              </ThemedText>
+            )}
+            {criteria.allergies.length > 0 && (
+              <ThemedText style={styles.summary} themeColor="textSecondary">
+                Avoiding: {criteria.allergies.join(', ')}
+              </ThemedText>
+            )}
           </View>
 
           <View style={styles.recommendations}>
@@ -79,7 +101,8 @@ function PlaceCard({ recommendation, rank, expanded, onToggle }: PlaceCardProps)
   const theme = useTheme();
 
   return (
-    <View
+    <Animated.View
+      layout={LinearTransition.duration(220)}
       style={[
         styles.placeCard,
         { backgroundColor: theme.backgroundElement, borderColor: theme.border },
@@ -110,13 +133,15 @@ function PlaceCard({ recommendation, rank, expanded, onToggle }: PlaceCardProps)
       </Pressable>
 
       {expanded && (
-        <View style={[styles.mealList, { borderTopColor: theme.border }]}>
-          {recommendation.meals.map((meal) => (
-            <MealRow key={meal.name} meal={meal} />
-          ))}
-        </View>
+        <ExpandableContent>
+          <View style={[styles.mealList, { borderTopColor: theme.border }]}>
+            {recommendation.meals.map((meal) => (
+              <MealRow key={meal.name} meal={meal} />
+            ))}
+          </View>
+        </ExpandableContent>
       )}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -140,16 +165,23 @@ function MealRow({ meal }: { meal: MealRecommendation }) {
 }
 
 function getTagStyle(healthTag: HealthTag, theme: ReturnType<typeof useTheme>) {
-  if (healthTag === 'Healthy') {
+  if (healthTag === 'Kinda Healthy') {
     return {
-      container: { backgroundColor: theme.accent },
-      text: { color: theme.background },
+      container: { backgroundColor: theme.kindaHealthySoft },
+      text: { color: theme.kindaHealthy },
+    };
+  }
+
+  if (healthTag === 'Unhealthy') {
+    return {
+      container: { backgroundColor: theme.unhealthySoft },
+      text: { color: theme.unhealthyText },
     };
   }
 
   return {
-    container: { backgroundColor: theme.backgroundSelected },
-    text: { color: theme.textSecondary },
+    container: { backgroundColor: theme.accentSoft },
+    text: { color: theme.accent },
   };
 }
 

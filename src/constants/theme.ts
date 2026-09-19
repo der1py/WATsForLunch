@@ -16,6 +16,11 @@ export const Colors = {
     textSecondary: '#60646C',
     accent: '#247A4D',
     accentSoft: '#E2F2E8',
+    kindaHealthy: '#B69A4E',
+    kindaHealthySoft: '#FFF8DE',
+    unhealthy: '#B42318',
+    unhealthySoft: '#FEE4E2',
+    unhealthyText: '#B42318',
     border: '#D8DAD8',
   },
   dark: {
@@ -26,6 +31,11 @@ export const Colors = {
     textSecondary: '#B0B4BA',
     accent: '#66C18A',
     accentSoft: '#193A28',
+    kindaHealthy: '#D9C478',
+    kindaHealthySoft: '#393523',
+    unhealthy: '#F97066',
+    unhealthySoft: '#48201D',
+    unhealthyText: '#FDA29B',
     border: '#3A3D40',
   },
 } as const;
