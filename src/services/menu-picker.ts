@@ -320,8 +320,12 @@ export function getEligibleMenuItems(
 // ---------------------------------------------------------------------------
 
 /** Random sample without replacement; entries that satisfy more "preferred" restrictions are likelier. */
-function sampleWeighted(pool: EligibleMenuItem[], count: number): EligibleMenuItem[] {
-  const remaining = [...pool];
+function sampleWeighted(
+  pool: EligibleMenuItem[],
+  count: number,
+  distinctRestaurants: boolean
+): EligibleMenuItem[] {
+  let remaining = [...pool];
   const picked: EligibleMenuItem[] = [];
 
   while (picked.length < count && remaining.length > 0) {
@@ -329,7 +333,13 @@ function sampleWeighted(pool: EligibleMenuItem[], count: number): EligibleMenuIt
     let roll = Math.random() * weights.reduce((sum, weight) => sum + weight, 0);
     let index = weights.findIndex((weight) => (roll -= weight) < 0);
     if (index === -1) index = remaining.length - 1;
-    picked.push(remaining.splice(index, 1)[0]);
+
+    const selection = remaining.splice(index, 1)[0];
+    picked.push(selection);
+
+    if (distinctRestaurants) {
+      remaining = remaining.filter((entry) => entry.restaurant !== selection.restaurant);
+    }
   }
 
   return picked;
@@ -385,8 +395,23 @@ function toRecommendation({ id, restaurant, item, healthTag }: EligibleMenuItem)
  */
 export function getMenuItemRecommendations(
   criteria: MenuFilterCriteria,
-  options: { count?: number; now?: Date } = {}
+  options: {
+    count?: number;
+    now?: Date;
+    restaurants?: readonly string[];
+    distinctRestaurants?: boolean;
+  } = {}
 ): MenuRecommendation[] {
-  const { count = DEFAULT_PICK_COUNT, now = new Date() } = options;
-  return sampleWeighted(getEligibleMenuItems(criteria, now), count).map(toRecommendation);
+  const {
+    count = DEFAULT_PICK_COUNT,
+    now = new Date(),
+    restaurants,
+    distinctRestaurants = false,
+  } = options;
+  const allowedRestaurants = restaurants ? new Set(restaurants) : undefined;
+  const eligibleItems = getEligibleMenuItems(criteria, now).filter(
+    (item) => !allowedRestaurants || allowedRestaurants.has(item.restaurant)
+  );
+
+  return sampleWeighted(eligibleItems, count, distinctRestaurants).map(toRecommendation);
 }

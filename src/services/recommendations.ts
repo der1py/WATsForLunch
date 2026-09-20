@@ -1,13 +1,8 @@
-import { restaurantFixtures } from '@/data/recommendations';
 import restaurantLocations from '@/data/restaurants.json';
-import {
-  filterAndRankRestaurants,
-  type Allergen,
-  type DietaryRestriction,
-  type HealthTag,
-} from '@/domain/recommendations/filter-and-rank';
+import type { Allergen, DietaryRestriction } from '@/domain/recommendations/filter-and-rank';
 import { getBuildingByName, getDefaultBuilding, type Building } from '@/services/buildings';
 import { getWalkingRouteInfos, type RouteInfo } from '@/services/maps';
+import { getMenuItemRecommendations, type HealthTag } from '@/services/menu-picker';
 
 export const transportOptions = ['Walk', 'Bike', 'Car', 'Transit'] as const;
 export const travelTimeOptions = [5, 10, 15, 20, 30] as const;
@@ -74,16 +69,25 @@ const defaultSearchCriteria: SearchCriteria = {
   allergies: [],
 };
 
-const locatedRestaurantFixtures = restaurantLocations.map((location, index) => {
-  const menuFixture = restaurantFixtures[index % restaurantFixtures.length];
+const menuRestaurantLocationNames = {
+  'EV3 Evergreen Cafe': 'EV3 Evergreen Cafe',
+  'ML Diner': 'ML Diner',
+  'Residence Pasta Station': "Mudie's",
+  'Residence REV Sandwich Station': 'REVelation',
+  'Southside Market Pasta Lab': 'South Side Marketplace',
+} as const;
 
-  return {
-    ...menuFixture,
-    id: `restaurant-${index + 1}`,
-    place: location.name,
-    location,
-  };
-});
+const menuRestaurantLocations = new Map(
+  Object.entries(menuRestaurantLocationNames).map(([restaurant, locationName]) => {
+    const location = restaurantLocations.find((candidate) => candidate.name === locationName);
+
+    if (!location) {
+      throw new Error(`Missing location for ${restaurant}`);
+    }
+
+    return [restaurant, location] as const;
+  })
+);
 
 export function getDefaultSearchCriteria(): SearchCriteria {
   return {
@@ -128,16 +132,14 @@ export function getSearchCriteriaFromParams(
 export async function getTopRecommendations(
   criteria: SearchCriteria
 ): Promise<PlaceRecommendation[]> {
-  const rankedRestaurantIds = filterAndRankRestaurants(locatedRestaurantFixtures, criteria).map(
-    (restaurant) => restaurant.id
-  );
-  const selectedRestaurantIds = (rankedRestaurantIds.length > 0
-    ? rankedRestaurantIds
-    : locatedRestaurantFixtures.map((restaurant) => restaurant.id)
-  ).slice(0, 3);
-  const selectedRestaurants = selectedRestaurantIds.map(
-    (id) => locatedRestaurantFixtures.find((restaurant) => restaurant.id === id)!
-  );
+  const selectedRestaurants = getMenuItemRecommendations(criteria, {
+    count: 3,
+    restaurants: Object.keys(menuRestaurantLocationNames),
+    distinctRestaurants: true,
+  }).map((recommendation) => ({
+    ...recommendation,
+    location: menuRestaurantLocations.get(recommendation.place)!,
+  }));
   const routeInfos = await getWalkingRouteInfos(
     criteria.building,
     selectedRestaurants.map((restaurant) => ({
@@ -154,11 +156,7 @@ export async function getTopRecommendations(
       place: restaurant.place,
       travelTime: routeInfo?.duration ?? 'Walking time unavailable',
       location: { ...restaurant.location },
-      meals: restaurant.meals.map(({ name, description, healthTag }) => ({
-        name,
-        description,
-        healthTag,
-      })),
+      meals: restaurant.meals,
       routeInfo,
     };
   });
