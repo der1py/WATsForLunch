@@ -18,7 +18,7 @@ export type RouteDestination = RouteCoordinates & {
   id: string;
 };
 
-type TravelMode = 'DRIVE' | 'WALK' | 'BICYCLE' | 'TRANSIT';
+export type TravelMode = 'DRIVE' | 'WALK' | 'BICYCLE' | 'TRANSIT';
 type MatrixRouteElement = {
   condition?: string;
   destinationIndex?: number;
@@ -30,7 +30,8 @@ const routeInfoCache = new Map<string, RouteInfo>();
 
 export async function getWalkingRouteInfos(
   origin: RouteCoordinates,
-  destinations: RouteDestination[]
+  destinations: RouteDestination[],
+  travelMode: TravelMode = 'WALK'
 ): Promise<Map<string, RouteInfo>> {
   if (destinations.length === 0) {
     return new Map();
@@ -47,7 +48,7 @@ export async function getWalkingRouteInfos(
     body: JSON.stringify({
       origins: [toMatrixWaypoint(origin)],
       destinations: destinations.map(toMatrixWaypoint),
-      travelMode: 'WALK',
+      travelMode,
     }),
   });
 

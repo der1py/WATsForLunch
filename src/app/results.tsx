@@ -105,7 +105,7 @@ export default function ResultsScreen() {
 
           <View style={styles.recommendations}>
             {isLoading ? (
-              <ThemedText themeColor="textSecondary">Calculating walking times…</ThemedText>
+              <ThemedText themeColor="textSecondary">Calculating {criteria.transport.toLowerCase()} times…</ThemedText>
             ) : (
               recommendationResult.recommendations.map((recommendation, index) => (
                 <PlaceCard
@@ -121,6 +121,7 @@ export default function ResultsScreen() {
                   origin={criteria.building}
                   rank={index + 1}
                   recommendation={recommendation}
+                  transport={criteria.transport}
                 />
               ))
             )}
@@ -137,9 +138,10 @@ type PlaceCardProps = {
   expanded: boolean;
   onToggle: () => void;
   origin: { name: string; latitude: number; longitude: number };
+  transport: 'Walk' | 'Bike';
 };
 
-function PlaceCard({ recommendation, rank, expanded, onToggle, origin }: PlaceCardProps) {
+function PlaceCard({ recommendation, rank, expanded, onToggle, origin, transport }: PlaceCardProps) {
   const theme = useTheme();
 
   return (
@@ -177,6 +179,7 @@ function PlaceCard({ recommendation, rank, expanded, onToggle, origin }: PlaceCa
                     originName: origin.name,
                     routeDistance: recommendation.routeInfo?.distance ?? '',
                     routeDuration: recommendation.routeInfo?.duration ?? '',
+                    transport,
                   },
                 })
               }

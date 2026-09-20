@@ -1,10 +1,10 @@
 import restaurantLocations from '@/data/restaurants.json';
 import type { Allergen, DietaryRestriction } from '@/domain/recommendations/filter-and-rank';
 import { getBuildingByName, getDefaultBuilding, type Building } from '@/services/buildings';
-import { getWalkingRouteInfos, type RouteInfo } from '@/services/maps';
+import { getWalkingRouteInfos, type RouteInfo, type TravelMode } from '@/services/maps';
 import { getMenuItemRecommendations, type HealthTag } from '@/services/menu-picker';
 
-export const transportOptions = ['Walk', 'Bike', 'Car', 'Transit'] as const;
+export const transportOptions = ['Walk', 'Bike'] as const;
 export const travelTimeOptions = [5, 10, 15, 20, 30] as const;
 export const eatingPreferenceOptions = ['Healthy', 'Kinda Healthy', 'Unhealthy'] as const;
 export const dietaryRestrictionOptions = [
@@ -151,7 +151,8 @@ export async function getTopRecommendations(
     selectedRestaurants.map((restaurant) => ({
       id: restaurant.id,
       ...restaurant.location,
-    }))
+    })),
+    getTravelMode(criteria.transport)
   ).catch(() => new Map<string, RouteInfo>());
 
   const maximumTravelSeconds = criteria.maximumTravelTime * 60;
@@ -195,6 +196,10 @@ function parseOptionList<T extends string>(
 
 function isTransport(value: string | undefined): value is Transport {
   return transportOptions.some((option) => option === value);
+}
+
+function getTravelMode(transport: Transport): TravelMode {
+  return transport === 'Bike' ? 'BICYCLE' : 'WALK';
 }
 
 function isTravelTime(value: number): value is TravelTime {

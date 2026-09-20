@@ -12,7 +12,6 @@ import type { RouteInfo } from '@/services/maps';
 
 const MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 const MAP_ASPECT_RATIO = 4 / 3;
-const TRAVEL_MODE = 'walking';
 
 const DEFAULT_DESTINATION = {
   name: 'Shawarma Hub',
@@ -24,6 +23,7 @@ const DEFAULT_DESTINATION = {
 type Coords = { latitude: number; longitude: number };
 type MapDestination = Coords & { name: string; address: string };
 type MapOrigin = Coords & { name: string };
+type Transport = 'Walk' | 'Bike';
 
 function getFirstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -68,8 +68,17 @@ function getRouteInfoFromParams(
   return duration && distance ? { duration, distance } : null;
 }
 
-function buildMapUrl(origin: MapOrigin | null, destination: MapDestination) {
+function getMapTravelMode(value: string | undefined) {
+  return value === 'Bike' ? 'bicycling' : 'walking';
+}
+
+function buildMapUrl(
+  origin: MapOrigin | null,
+  destination: MapDestination,
+  transport: Transport
+) {
   const destinationCoordinates = `${destination.latitude},${destination.longitude}`;
+  const travelMode = getMapTravelMode(transport);
 
   if (!origin) {
     return `https://www.google.com/maps/embed/v1/place?key=${MAPS_API_KEY}&q=${encodeURIComponent(destinationCoordinates)}`;
@@ -79,7 +88,7 @@ function buildMapUrl(origin: MapOrigin | null, destination: MapDestination) {
     `https://www.google.com/maps/embed/v1/directions?key=${MAPS_API_KEY}` +
     `&origin=${origin.latitude},${origin.longitude}` +
     `&destination=${encodeURIComponent(destinationCoordinates)}` +
-    `&mode=${TRAVEL_MODE}`
+    `&mode=${travelMode}`
   );
 }
 
@@ -102,13 +111,15 @@ function GoogleMapEmbed({
   destination,
   origin,
   routeInfo,
+  transport,
 }: {
   destination: MapDestination;
   origin: MapOrigin | null;
   routeInfo: RouteDisplayInfo | null;
+  transport: Transport;
 }) {
   const theme = useTheme();
-  const mapUrl = buildMapUrl(origin, destination);
+  const mapUrl = buildMapUrl(origin, destination, transport);
 
   return (
     <View style={[styles.mapCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
@@ -149,7 +160,7 @@ function GoogleMapEmbed({
                 {routeInfo.duration}
               </ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                {routeInfo.distance} walk to {destination.name}
+                {routeInfo.distance} {transport.toLowerCase()} to {destination.name}
               </ThemedText>
             </View>
           )}
@@ -164,6 +175,7 @@ export default function MapScreen() {
   const destination = getMapDestination(params);
   const origin = getMapOrigin(params);
   const routeInfo = getRouteInfoFromParams(params);
+  const transport = getFirstParam(params.transport) === 'Bike' ? 'Bike' : 'Walk';
 
   return (
     <ThemedView style={styles.container}>
@@ -185,7 +197,12 @@ export default function MapScreen() {
             <ThemedText type="smallBold">Results</ThemedText>
           </Pressable>
 
-          <GoogleMapEmbed destination={destination} origin={origin} routeInfo={routeInfo} />
+          <GoogleMapEmbed
+            destination={destination}
+            origin={origin}
+            routeInfo={routeInfo}
+            transport={transport}
+          />
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
