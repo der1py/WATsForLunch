@@ -57,9 +57,11 @@ function getMapOrigin(params: Record<string, string | string[] | undefined>): Ma
   return { name, latitude, longitude };
 }
 
+type RouteDisplayInfo = Pick<RouteInfo, 'duration' | 'distance'>;
+
 function getRouteInfoFromParams(
   params: Record<string, string | string[] | undefined>
-): RouteInfo | null {
+): RouteDisplayInfo | null {
   const duration = getFirstParam(params.routeDuration)?.trim();
   const distance = getFirstParam(params.routeDistance)?.trim();
 
@@ -103,7 +105,7 @@ function GoogleMapEmbed({
 }: {
   destination: MapDestination;
   origin: MapOrigin | null;
-  routeInfo: RouteInfo | null;
+  routeInfo: RouteDisplayInfo | null;
 }) {
   const theme = useTheme();
   const mapUrl = buildMapUrl(origin, destination);

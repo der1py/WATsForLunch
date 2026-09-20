@@ -10,6 +10,7 @@ export type RouteCoordinates = {
 
 export type RouteInfo = {
   duration: string;
+  durationSeconds: number;
   distance: string;
 };
 
@@ -74,8 +75,14 @@ export async function getWalkingRouteInfos(
       continue;
     }
 
+    const durationSeconds = parseDurationSeconds(element.duration);
+    if (durationSeconds === undefined) {
+      continue;
+    }
+
     routeInfos.set(destination.id, {
-      duration: formatDuration(parseInt(element.duration, 10)),
+      duration: formatDuration(durationSeconds),
+      durationSeconds,
       distance: formatDistance(element.distanceMeters ?? 0),
     });
   }
@@ -124,8 +131,12 @@ export async function getRouteInfo(
   const route = data.routes?.[0];
   if (!route) throw new Error('No route found');
 
+  const durationSeconds = parseDurationSeconds(route.duration);
+  if (durationSeconds === undefined) throw new Error('Route duration was invalid');
+
   const routeInfo = {
-    duration: formatDuration(parseInt(route.duration, 10)),
+    duration: formatDuration(durationSeconds),
+    durationSeconds,
     distance: formatDistance(route.distanceMeters ?? 0),
   };
 
@@ -170,6 +181,11 @@ function getCacheKey(origin: RouteCoordinates, destination: RouteCoordinates, tr
     destination.latitude,
     destination.longitude,
   ].join(':');
+}
+
+function parseDurationSeconds(value: string): number | undefined {
+  const seconds = Number.parseInt(value, 10);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
 }
 
 function formatDuration(seconds: number) {
