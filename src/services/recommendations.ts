@@ -136,6 +136,7 @@ export async function getTopRecommendations(
     count: Object.keys(menuRestaurantLocationNames).length,
     restaurants: Object.keys(menuRestaurantLocationNames),
     distinctRestaurants: true,
+    mealsPerRestaurant: 3,
   }).map((recommendation) => ({
     ...recommendation,
     location: menuRestaurantLocations.get(recommendation.place)!,

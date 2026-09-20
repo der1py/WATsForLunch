@@ -373,25 +373,32 @@ function summarizeIngredients(ingredients: string | null, max = 5): string {
   return cleaned.length > max ? `${shown}…` : shown;
 }
 
-function toRecommendation({ id, restaurant, item, healthTag }: EligibleMenuItem): MenuRecommendation {
+function toMealRecommendation({ item, healthTag }: EligibleMenuItem): MenuMeal {
   const preview = summarizeIngredients(item.ingredients);
+
+  return {
+    name: item.name,
+    description: preview ? `${item.section} · ${preview}` : item.section,
+    healthTag,
+  };
+}
+
+function toRecommendation(
+  { id, restaurant }: EligibleMenuItem,
+  items: EligibleMenuItem[]
+): MenuRecommendation {
   return {
     id,
     place: restaurant,
-    meals: [
-      {
-        name: item.name,
-        description: preview ? `${item.section} · ${preview}` : item.section,
-        healthTag,
-      },
-    ],
+    meals: items.map(toMealRecommendation),
     location: RESTAURANT_LOCATIONS[restaurant],
   };
 }
 
 /**
  * Filters every uw-menus.json item by the user's criteria and returns `count`
- * (default 3) random ones. Returns fewer than `count` if fewer pass the filters.
+ * (default 3) random restaurants. Each recommendation contains up to
+ * `mealsPerRestaurant` distinct eligible items from that restaurant.
  */
 export function getMenuItemRecommendations(
   criteria: MenuFilterCriteria,
@@ -400,6 +407,7 @@ export function getMenuItemRecommendations(
     now?: Date;
     restaurants?: readonly string[];
     distinctRestaurants?: boolean;
+    mealsPerRestaurant?: number;
   } = {}
 ): MenuRecommendation[] {
   const {
@@ -407,11 +415,22 @@ export function getMenuItemRecommendations(
     now = new Date(),
     restaurants,
     distinctRestaurants = false,
+    mealsPerRestaurant = 1,
   } = options;
   const allowedRestaurants = restaurants ? new Set(restaurants) : undefined;
   const eligibleItems = getEligibleMenuItems(criteria, now).filter(
     (item) => !allowedRestaurants || allowedRestaurants.has(item.restaurant)
   );
 
-  return sampleWeighted(eligibleItems, count, distinctRestaurants).map(toRecommendation);
+  return sampleWeighted(eligibleItems, count, distinctRestaurants).map((selection) => {
+    const additionalItems = sampleWeighted(
+      eligibleItems.filter(
+        (item) => item.restaurant === selection.restaurant && item.id !== selection.id
+      ),
+      Math.max(0, mealsPerRestaurant - 1),
+      false
+    );
+
+    return toRecommendation(selection, [selection, ...additionalItems]);
+  });
 }
