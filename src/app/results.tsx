@@ -17,7 +17,11 @@ import {
 
 export default function ResultsScreen() {
   const params = useLocalSearchParams();
-  const criteria = useMemo(() => getSearchCriteriaFromParams(params), [params]);
+  const paramsKey = JSON.stringify(params);
+  const criteria = useMemo(
+    () => getSearchCriteriaFromParams(JSON.parse(paramsKey)),
+    [paramsKey]
+  );
   const criteriaKey = [
     criteria.building.name,
     criteria.transport,
