@@ -45,6 +45,23 @@ function chooseItem(
   })[0];
 }
 
+export function isCompleteCafeteriaMeal(
+  selectedItems: readonly CafeteriaMenuItem[],
+  availableItems: readonly CafeteriaMenuItem[]
+): boolean {
+  const selectedCategories = selectedItems.map(classifyItem);
+  if (selectedCategories.some((category) => category === undefined)) return false;
+  if (new Set(selectedCategories).size !== selectedCategories.length) return false;
+
+  const availableCategories = new Set(
+    availableItems
+      .map(classifyItem)
+      .filter((category): category is CafeteriaMealCategory => category !== undefined)
+  );
+
+  return [...availableCategories].every((category) => selectedCategories.includes(category));
+}
+
 /**
  * Forms the closest available cafeteria meal from already-filtered items.
  * It never adds unclassified items, so drinks, desserts, and arbitrary extras

@@ -136,13 +136,13 @@ export function getSearchCriteriaFromParams(
 export async function getTopRecommendations(
   criteria: SearchCriteria
 ): Promise<PlaceRecommendation[]> {
-  const selectedRestaurants = getMenuItemRecommendations(criteria, {
+  const selectedRestaurants = (await getMenuItemRecommendations(criteria, {
     count: Object.keys(menuRestaurantLocationNames).length,
     restaurants: Object.keys(menuRestaurantLocationNames),
     cafeteriaRestaurants: cafeteriaMenuRestaurants,
     distinctRestaurants: true,
     mealsPerRestaurant: 3,
-  }).map((recommendation) => ({
+  })).map((recommendation) => ({
     ...recommendation,
     location: menuRestaurantLocations.get(recommendation.place)!,
   }));

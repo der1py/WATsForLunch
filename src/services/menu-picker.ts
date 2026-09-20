@@ -10,12 +10,9 @@
  *   data/uw-menus.json    ingredient / dietary guide (one entry per restaurant)
  *   services/menu-picker.ts   <- this file
  */
+import { getCafeteriaMeals } from '@/services/cafeteria-meals';
 import menusJson from '../data/menus.json';
 import uwMenusJson from '../data/uw-menus.json';
-import {
-  composeCafeteriaMeal,
-  type CafeteriaHealthPreference,
-} from '../domain/cafeteria/meal-composer';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -387,40 +384,20 @@ function toMealRecommendation({ item, healthTag }: EligibleMenuItem): MenuMeal {
   };
 }
 
-function toCafeteriaMealRecommendation(
+async function toCafeteriaMealRecommendations(
   items: EligibleMenuItem[],
   eatingPreferences: readonly string[]
-): MenuMeal | undefined {
-  const preference = getCafeteriaHealthPreference(eatingPreferences);
-  const meal = composeCafeteriaMeal(
-    items.map(({ id, item }) => ({
+): Promise<MenuMeal[]> {
+  return getCafeteriaMeals(
+    items.map(({ id, item, healthTag }) => ({
       id,
       name: item.name,
       section: item.section,
       healthScore: item.healthScore,
+      healthTag,
     })),
-    preference
+    eatingPreferences
   );
-
-  if (!meal) return undefined;
-
-  return {
-    name: meal.items.map((item) => item.name).join(' + '),
-    description: 'Cafeteria meal · protein, carb/starch, and vegetables when available',
-    healthTag: getHealthTag(meal.averageHealthScore),
-  };
-}
-
-function getCafeteriaHealthPreference(
-  eatingPreferences: readonly string[]
-): CafeteriaHealthPreference {
-  const preferences = new Set(eatingPreferences.map(canon));
-  const wantsHealthy = preferences.has('healthy');
-  const wantsUnhealthy = preferences.has('unhealthy');
-
-  if (wantsHealthy && !wantsUnhealthy) return 'healthy';
-  if (wantsUnhealthy && !wantsHealthy) return 'unhealthy';
-  return 'neutral';
 }
 
 function toRecommendation(
@@ -437,12 +414,12 @@ function toRecommendation(
 
 function toCafeteriaRecommendation(
   { id, restaurant }: EligibleMenuItem,
-  meal: MenuMeal
+  meals: MenuMeal[]
 ): MenuRecommendation {
   return {
     id,
     place: restaurant,
-    meals: [meal],
+    meals,
     location: RESTAURANT_LOCATIONS[restaurant],
   };
 }
@@ -452,7 +429,7 @@ function toCafeteriaRecommendation(
  * (default 3) random restaurants. Each recommendation contains up to
  * `mealsPerRestaurant` distinct eligible items from that restaurant.
  */
-export function getMenuItemRecommendations(
+export async function getMenuItemRecommendations(
   criteria: MenuFilterCriteria,
   options: {
     count?: number;
@@ -462,7 +439,7 @@ export function getMenuItemRecommendations(
     distinctRestaurants?: boolean;
     mealsPerRestaurant?: number;
   } = {}
-): MenuRecommendation[] {
+): Promise<MenuRecommendation[]> {
   const {
     count = DEFAULT_PICK_COUNT,
     now = new Date(),
@@ -477,12 +454,15 @@ export function getMenuItemRecommendations(
     (item) => !allowedRestaurants || allowedRestaurants.has(item.restaurant)
   );
 
-  return sampleWeighted(eligibleItems, count, distinctRestaurants).map((selection) => {
+  return Promise.all(sampleWeighted(eligibleItems, count, distinctRestaurants).map(async (selection) => {
     const restaurantItems = eligibleItems.filter((item) => item.restaurant === selection.restaurant);
 
     if (cafeteriaRestaurantSet.has(selection.restaurant)) {
-      const cafeteriaMeal = toCafeteriaMealRecommendation(restaurantItems, criteria.eatingPreferences);
-      if (cafeteriaMeal) return toCafeteriaRecommendation(selection, cafeteriaMeal);
+      const cafeteriaMeals = await toCafeteriaMealRecommendations(
+        restaurantItems,
+        criteria.eatingPreferences
+      );
+      if (cafeteriaMeals.length > 0) return toCafeteriaRecommendation(selection, cafeteriaMeals);
     }
 
     const additionalItems = sampleWeighted(
@@ -492,5 +472,5 @@ export function getMenuItemRecommendations(
     );
 
     return toRecommendation(selection, [selection, ...additionalItems]);
-  });
+  }));
 }
