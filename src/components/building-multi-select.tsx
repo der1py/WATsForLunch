@@ -26,7 +26,7 @@ export function BuildingMultiSelect({ onChange, selectedBuilding }: BuildingMult
   }
 
   function hideDropdownAfterTap() {
-    blurTimeout.current = setTimeout(() => setIsFocused(false), 100);
+    blurTimeout.current = setTimeout(() => setIsFocused(false), 300);
   }
 
   function selectBuilding(building: Building) {
@@ -85,7 +85,7 @@ export function BuildingMultiSelect({ onChange, selectedBuilding }: BuildingMult
                     accessibilityRole="radio"
                     accessibilityState={{ selected }}
                     key={building.name}
-                    onPress={() => selectBuilding(building)}
+                    onPressIn={() => selectBuilding(building)}
                     style={({ pressed }) => [
                       styles.row,
                       {
@@ -134,6 +134,7 @@ const styles = StyleSheet.create({
     gap: Spacing.half,
   },
   dropdown: {
+    elevation: 4,
     borderRadius: Spacing.three,
     borderWidth: 1,
     overflow: 'hidden',
@@ -146,7 +147,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     flexDirection: 'row',
     gap: Spacing.two,
-    minHeight: 48,
+    minHeight: 56,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
   },
