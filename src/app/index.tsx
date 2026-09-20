@@ -153,12 +153,6 @@ export default function HomeScreen() {
                 ))}
               </OptionRow>
 
-              <FieldLabel label="Only show places open now?" />
-              <OptionRow>
-                <OptionButton label="Yes" onPress={() => setOpenNow(true)} selected={openNow} />
-                <OptionButton label="No" onPress={() => setOpenNow(false)} selected={!openNow} />
-              </OptionRow>
-
               <FieldLabel label="Maximum travel time" />
               <OptionRow>
                 {travelTimeOptions.map((minutes) => (
