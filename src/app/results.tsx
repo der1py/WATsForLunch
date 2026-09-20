@@ -8,15 +8,20 @@ import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
-  getSearchCriteriaFromParams,
-  getTopRecommendations,
+  getMenuItemRecommendations,
   type HealthTag,
-  type MealRecommendation,
-  type PlaceRecommendation,
-} from '@/services/recommendations';
+  type MenuMeal,
+  type MenuRecommendation,
+} from '@/services/menu-picker';
+import { getSearchCriteriaFromParams } from '@/services/recommendations';
 
 export default function ResultsScreen() {
   const params = useLocalSearchParams();
+  const criteria = getSearchCriteriaFromParams(params);
+  // Lazy initial state: pick once when this screen opens (i.e. when "Let's eat!" is pressed).
+  // Picking during render would reshuffle the meals every time a card is expanded or collapsed.
+  const [recommendations] = useState(() => getMenuItemRecommendations(criteria));
+  const [expandedPlaceId, setExpandedPlaceId] = useState<string | null>(recommendations[0]?.id ?? null);
   const paramsKey = JSON.stringify(params);
   const criteria = useMemo(
     () => getSearchCriteriaFromParams(JSON.parse(paramsKey)),
@@ -81,7 +86,7 @@ export default function ResultsScreen() {
 
           <View style={styles.heading}>
             <ThemedText style={styles.eyebrow} themeColor="accent">
-              YOUR TOP 3
+              {recommendations.length > 0 ? `YOUR TOP ${recommendations.length}` : 'NO MATCHES'}
             </ThemedText>
             <ThemedText type="subtitle">Lunch near {criteria.location}</ThemedText>
             <ThemedText style={styles.summary} themeColor="textSecondary">
@@ -102,6 +107,13 @@ export default function ResultsScreen() {
               </ThemedText>
             )}
           </View>
+
+          {recommendations.length === 0 && (
+            <ThemedText themeColor="textSecondary">
+              Nothing on the menu matches those filters right now. Try loosening a dietary
+              requirement or allergy, or picking more moods.
+            </ThemedText>
+          )}
 
           <View style={styles.recommendations}>
             {isLoading ? (
@@ -132,7 +144,7 @@ export default function ResultsScreen() {
 }
 
 type PlaceCardProps = {
-  recommendation: PlaceRecommendation;
+  recommendation: MenuRecommendation;
   rank: number;
   expanded: boolean;
   onToggle: () => void;
@@ -141,6 +153,8 @@ type PlaceCardProps = {
 
 function PlaceCard({ recommendation, rank, expanded, onToggle, origin }: PlaceCardProps) {
   const theme = useTheme();
+  const { location, travelTime } = recommendation;
+  const mealCount = recommendation.meals.length;
 
   return (
     <View
@@ -156,6 +170,45 @@ function PlaceCard({ recommendation, rank, expanded, onToggle, origin }: PlaceCa
         </View>
         <View style={styles.placeName}>
           <ThemedText style={styles.placeTitle}>{recommendation.place}</ThemedText>
+          {(travelTime || location) && (
+            <View style={{ alignItems: 'center', flexDirection: 'row', gap: Spacing.two }}>
+              {travelTime ? (
+                <ThemedText type="small" themeColor="textSecondary">
+                  {travelTime}
+                </ThemedText>
+              ) : null}
+              {location ? (
+                <Pressable
+                  accessibilityLabel={`Navigate to ${recommendation.place}`}
+                  accessibilityRole="button"
+                  hitSlop={Spacing.two}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/map',
+                      params: {
+                        address: location.address,
+                        latitude: String(location.latitude),
+                        longitude: String(location.longitude),
+                        name: recommendation.place,
+                      },
+                    })
+                  }
+                  style={({ pressed }) => [
+                    {
+                      backgroundColor: theme.accentSoft,
+                      borderRadius: Spacing.two,
+                      paddingHorizontal: Spacing.two,
+                      paddingVertical: Spacing.half,
+                    },
+                    pressed && styles.pressed,
+                  ]}>
+                  <ThemedText type="smallBold" themeColor="accent">
+                    Navigate →
+                  </ThemedText>
+                </Pressable>
+              ) : null}
+            </View>
+          )}
           <View style={{ alignItems: 'center', flexDirection: 'row', gap: Spacing.two }}>
             <ThemedText type="small" themeColor="textSecondary">
               {recommendation.travelTime}
@@ -203,7 +256,9 @@ function PlaceCard({ recommendation, rank, expanded, onToggle, origin }: PlaceCa
         onPress={onToggle}
         style={({ pressed }) => [styles.mealToggle, pressed && styles.pressed]}>
         <ThemedText type="smallBold" themeColor="accent">
-          {expanded ? 'Hide meal recommendations' : `See ${recommendation.meals.length} meal recommendations`}
+          {expanded
+            ? `Hide meal recommendation${mealCount === 1 ? '' : 's'}`
+            : `See ${mealCount} meal recommendation${mealCount === 1 ? '' : 's'}`}
         </ThemedText>
         <ThemedText style={[styles.chevron, { color: theme.accent }]}>{expanded ? '⌃' : '⌄'}</ThemedText>
       </Pressable>
@@ -219,7 +274,7 @@ function PlaceCard({ recommendation, rank, expanded, onToggle, origin }: PlaceCa
   );
 }
 
-function MealRow({ meal }: { meal: MealRecommendation }) {
+function MealRow({ meal }: { meal: MenuMeal }) {
   const theme = useTheme();
   const tagStyle = getTagStyle(meal.healthTag, theme);
 
