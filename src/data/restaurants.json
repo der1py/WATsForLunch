@@ -3,36 +3,42 @@
     "name": "EV3 Evergreen Cafe",
     "address": "Environment 3 (EV3), University of Waterloo, Waterloo, ON",
     "latitude": 43.46804,
-    "longitude": -80.54326
+    "longitude": -80.54326,
+    "cafeteria": false
   },
   {
     "name": "ML Diner",
     "address": "Modern Languages (ML), University of Waterloo, Waterloo, ON",
     "latitude": 43.47077,
-    "longitude": -80.54476
+    "longitude": -80.54476,
+    "cafeteria": false
   },
   {
     "name": "REVelation",
     "address": "Ron Eydt Village (REV), 200 University Avenue West, Waterloo, ON N2J 4C1",
     "latitude": 43.47000,
-    "longitude": -80.55333
+    "longitude": -80.55333,
+    "cafeteria": true
   },
   {
     "name": "Mudie's",
     "address": "Village 1 (V1), 200 University Avenue West, Waterloo, ON N2L 3G1",
     "latitude": 43.47164,
-    "longitude": -80.54994
+    "longitude": -80.54994,
+    "cafeteria": true
   },
   {
     "name": "The Market at CMH",
     "address": "Claudette Millar Hall (CMH), 165 University Avenue West, Waterloo, ON N2L 3E8",
-    "latitude": 43.47030,
-    "longitude": -80.53583
+    "latitude": 43.4703,
+    "longitude": -80.53583,
+    "cafeteria": true
   },
   {
     "name": "South Side Marketplace",
     "address": "South Campus Hall (SCH), University of Waterloo, Waterloo, ON",
     "latitude": 43.46921,
-    "longitude": -80.54029
+    "longitude": -80.54029,
+    "cafeteria": false
   }
 ]

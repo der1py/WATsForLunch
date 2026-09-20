@@ -89,6 +89,10 @@ const menuRestaurantLocations = new Map(
   })
 );
 
+const cafeteriaMenuRestaurants = [...menuRestaurantLocations]
+  .filter(([, location]) => location.cafeteria)
+  .map(([restaurant]) => restaurant);
+
 export function getDefaultSearchCriteria(): SearchCriteria {
   return {
     ...defaultSearchCriteria,
@@ -135,6 +139,7 @@ export async function getTopRecommendations(
   const selectedRestaurants = getMenuItemRecommendations(criteria, {
     count: Object.keys(menuRestaurantLocationNames).length,
     restaurants: Object.keys(menuRestaurantLocationNames),
+    cafeteriaRestaurants: cafeteriaMenuRestaurants,
     distinctRestaurants: true,
     mealsPerRestaurant: 3,
   }).map((recommendation) => ({

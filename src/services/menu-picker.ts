@@ -12,6 +12,10 @@
  */
 import menusJson from '../data/menus.json';
 import uwMenusJson from '../data/uw-menus.json';
+import {
+  composeCafeteriaMeal,
+  type CafeteriaHealthPreference,
+} from '../domain/cafeteria/meal-composer';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -383,6 +387,42 @@ function toMealRecommendation({ item, healthTag }: EligibleMenuItem): MenuMeal {
   };
 }
 
+function toCafeteriaMealRecommendation(
+  items: EligibleMenuItem[],
+  eatingPreferences: readonly string[]
+): MenuMeal | undefined {
+  const preference = getCafeteriaHealthPreference(eatingPreferences);
+  const meal = composeCafeteriaMeal(
+    items.map(({ id, item }) => ({
+      id,
+      name: item.name,
+      section: item.section,
+      healthScore: item.healthScore,
+    })),
+    preference
+  );
+
+  if (!meal) return undefined;
+
+  return {
+    name: meal.items.map((item) => item.name).join(' + '),
+    description: 'Cafeteria meal · protein, carb/starch, and vegetables when available',
+    healthTag: getHealthTag(meal.averageHealthScore),
+  };
+}
+
+function getCafeteriaHealthPreference(
+  eatingPreferences: readonly string[]
+): CafeteriaHealthPreference {
+  const preferences = new Set(eatingPreferences.map(canon));
+  const wantsHealthy = preferences.has('healthy');
+  const wantsUnhealthy = preferences.has('unhealthy');
+
+  if (wantsHealthy && !wantsUnhealthy) return 'healthy';
+  if (wantsUnhealthy && !wantsHealthy) return 'unhealthy';
+  return 'neutral';
+}
+
 function toRecommendation(
   { id, restaurant }: EligibleMenuItem,
   items: EligibleMenuItem[]
@@ -391,6 +431,18 @@ function toRecommendation(
     id,
     place: restaurant,
     meals: items.map(toMealRecommendation),
+    location: RESTAURANT_LOCATIONS[restaurant],
+  };
+}
+
+function toCafeteriaRecommendation(
+  { id, restaurant }: EligibleMenuItem,
+  meal: MenuMeal
+): MenuRecommendation {
+  return {
+    id,
+    place: restaurant,
+    meals: [meal],
     location: RESTAURANT_LOCATIONS[restaurant],
   };
 }
@@ -406,6 +458,7 @@ export function getMenuItemRecommendations(
     count?: number;
     now?: Date;
     restaurants?: readonly string[];
+    cafeteriaRestaurants?: readonly string[];
     distinctRestaurants?: boolean;
     mealsPerRestaurant?: number;
   } = {}
@@ -414,19 +467,26 @@ export function getMenuItemRecommendations(
     count = DEFAULT_PICK_COUNT,
     now = new Date(),
     restaurants,
+    cafeteriaRestaurants = [],
     distinctRestaurants = false,
     mealsPerRestaurant = 1,
   } = options;
   const allowedRestaurants = restaurants ? new Set(restaurants) : undefined;
+  const cafeteriaRestaurantSet = new Set(cafeteriaRestaurants);
   const eligibleItems = getEligibleMenuItems(criteria, now).filter(
     (item) => !allowedRestaurants || allowedRestaurants.has(item.restaurant)
   );
 
   return sampleWeighted(eligibleItems, count, distinctRestaurants).map((selection) => {
+    const restaurantItems = eligibleItems.filter((item) => item.restaurant === selection.restaurant);
+
+    if (cafeteriaRestaurantSet.has(selection.restaurant)) {
+      const cafeteriaMeal = toCafeteriaMealRecommendation(restaurantItems, criteria.eatingPreferences);
+      if (cafeteriaMeal) return toCafeteriaRecommendation(selection, cafeteriaMeal);
+    }
+
     const additionalItems = sampleWeighted(
-      eligibleItems.filter(
-        (item) => item.restaurant === selection.restaurant && item.id !== selection.id
-      ),
+      restaurantItems.filter((item) => item.id !== selection.id),
       Math.max(0, mealsPerRestaurant - 1),
       false
     );
