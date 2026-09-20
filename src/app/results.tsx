@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,11 +8,12 @@ import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
-  getMenuItemRecommendations,
+  getSearchCriteriaFromParams,
+  getTopRecommendations,
   type HealthTag,
-  type MenuRecommendation,
-} from '@/services/menu-picker';
-import { getSearchCriteriaFromParams } from '@/services/recommendations';
+  type MealRecommendation,
+  type PlaceRecommendation,
+} from '@/services/recommendations';
 
 export default function ResultsScreen() {
   const params = useLocalSearchParams();
@@ -21,10 +22,40 @@ export default function ResultsScreen() {
     () => getSearchCriteriaFromParams(JSON.parse(paramsKey)),
     [paramsKey]
   );
-  // Lazy initial state: pick once when this screen opens (i.e. when "Let's eat!" is pressed).
-  // Picking during render would reshuffle the meals every time a card is expanded or collapsed.
-  const [recommendations] = useState(() => getMenuItemRecommendations(criteria));
-  const [expandedPlaceId, setExpandedPlaceId] = useState<string | null>(recommendations[0]?.id ?? null);
+  const criteriaKey = [
+    criteria.building.name,
+    criteria.transport,
+    criteria.openNow,
+    criteria.maximumTravelTime,
+    criteria.eatingPreferences.join(','),
+    criteria.requiredDietary.join(','),
+    criteria.preferredDietary.join(','),
+    criteria.allergies.join(','),
+  ].join('|');
+  const [recommendationResult, setRecommendationResult] = useState<{
+    criteriaKey: string;
+    recommendations: PlaceRecommendation[];
+    expandedPlaceId: string | null;
+  }>({ criteriaKey: '', recommendations: [], expandedPlaceId: null });
+  const isLoading = recommendationResult.criteriaKey !== criteriaKey;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getTopRecommendations(criteria).then((nextRecommendations) => {
+      if (!cancelled) {
+        setRecommendationResult({
+          criteriaKey,
+          recommendations: nextRecommendations,
+          expandedPlaceId: nextRecommendations[0]?.id ?? null,
+        });
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [criteria, criteriaKey]);
 
   return (
     <ThemedView style={styles.container}>
@@ -50,9 +81,9 @@ export default function ResultsScreen() {
 
           <View style={styles.heading}>
             <ThemedText style={styles.eyebrow} themeColor="accent">
-              {recommendations.length > 0 ? `YOUR TOP ${recommendations.length}` : 'NO MATCHES'}
+              YOUR TOP 3
             </ThemedText>
-            <ThemedText type="subtitle">Lunch near {criteria.building.name}</ThemedText>
+            <ThemedText type="subtitle">Lunch near {criteria.location}</ThemedText>
             <ThemedText style={styles.summary} themeColor="textSecondary">
               {criteria.transport} · up to {criteria.maximumTravelTime} min ·{' '}
               {criteria.eatingPreferences.join(' + ')}
@@ -72,28 +103,27 @@ export default function ResultsScreen() {
             )}
           </View>
 
-          {recommendations.length === 0 && (
-            <ThemedText themeColor="textSecondary">
-              Nothing on the menu matches those filters right now. Try loosening a dietary
-              requirement or allergy, or picking more moods.
-            </ThemedText>
-          )}
-
           <View style={styles.recommendations}>
-            {recommendations.map((recommendation, index) => (
-              <PlaceCard
-                expanded={expandedPlaceId === recommendation.id}
-                key={recommendation.id}
-                onToggle={() =>
-                  setExpandedPlaceId((current) =>
-                    current === recommendation.id ? null : recommendation.id
-                  )
-                }
-                origin={criteria.building}
-                rank={index + 1}
-                recommendation={recommendation}
-              />
-            ))}
+            {isLoading ? (
+              <ThemedText themeColor="textSecondary">Calculating walking times…</ThemedText>
+            ) : (
+              recommendationResult.recommendations.map((recommendation, index) => (
+                <PlaceCard
+                  expanded={recommendationResult.expandedPlaceId === recommendation.id}
+                  key={recommendation.id}
+                  onToggle={() =>
+                    setRecommendationResult((current) => ({
+                      ...current,
+                      expandedPlaceId:
+                        current.expandedPlaceId === recommendation.id ? null : recommendation.id,
+                    }))
+                  }
+                  origin={criteria.building}
+                  rank={index + 1}
+                  recommendation={recommendation}
+                />
+              ))
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -102,7 +132,7 @@ export default function ResultsScreen() {
 }
 
 type PlaceCardProps = {
-  recommendation: MenuRecommendation;
+  recommendation: PlaceRecommendation;
   rank: number;
   expanded: boolean;
   onToggle: () => void;
@@ -111,14 +141,6 @@ type PlaceCardProps = {
 
 function PlaceCard({ recommendation, rank, expanded, onToggle, origin }: PlaceCardProps) {
   const theme = useTheme();
-  const { location, travelTime } = recommendation;
-  const meal = recommendation.meals[0];
-
-  if (!meal) {
-    return null;
-  }
-
-  const tagStyle = getTagStyle(meal.healthTag, theme);
 
   return (
     <View
@@ -132,46 +154,12 @@ function PlaceCard({ recommendation, rank, expanded, onToggle, origin }: PlaceCa
             {rank}
           </ThemedText>
         </View>
-        <View style={styles.itemDetails}>
-          <View style={styles.itemTitleRow}>
-            <ThemedText style={styles.itemTitle}>{meal.name}</ThemedText>
-            {travelTime ? (
-              <ThemedText style={styles.travelTime} type="smallBold" themeColor="accent">
-                {travelTime}
-              </ThemedText>
-            ) : null}
-          </View>
-          <ThemedText type="small" themeColor="textSecondary">
-            {meal.description}
-          </ThemedText>
-          <View style={[styles.tag, tagStyle.container]}>
-            <ThemedText style={[styles.tagText, tagStyle.text]}>{meal.healthTag}</ThemedText>
-          </View>
-        </View>
-      </View>
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ expanded }}
-        onPress={onToggle}
-        style={({ pressed }) => [styles.locationToggle, pressed && styles.pressed]}>
-        <ThemedText type="smallBold" themeColor="accent">
-          {expanded ? 'Hide location' : 'See location'}
-        </ThemedText>
-        <ThemedText style={[styles.chevron, { color: theme.accent }]}>{expanded ? '⌃' : '⌄'}</ThemedText>
-      </Pressable>
-
-      {expanded ? (
-        <View style={[styles.locationSection, { borderTopColor: theme.border }]}>
-          <View style={styles.locationText}>
-            <ThemedText type="smallBold">{recommendation.place}</ThemedText>
-            {location ? (
-              <ThemedText type="small" themeColor="textSecondary">
-                {location.address}
-              </ThemedText>
-            ) : null}
-          </View>
-          {location ? (
+        <View style={styles.placeName}>
+          <ThemedText style={styles.placeTitle}>{recommendation.place}</ThemedText>
+          <View style={{ alignItems: 'center', flexDirection: 'row', gap: Spacing.two }}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {recommendation.travelTime}
+            </ThemedText>
             <Pressable
               accessibilityLabel={`Navigate to ${recommendation.place}`}
               accessibilityRole="button"
@@ -180,17 +168,15 @@ function PlaceCard({ recommendation, rank, expanded, onToggle, origin }: PlaceCa
                 router.push({
                   pathname: '/map',
                   params: {
-                    address: location.address,
-                    latitude: String(location.latitude),
-                    longitude: String(location.longitude),
+                    address: recommendation.location.address,
+                    latitude: String(recommendation.location.latitude),
+                    longitude: String(recommendation.location.longitude),
                     name: recommendation.place,
                     originLatitude: String(origin.latitude),
                     originLongitude: String(origin.longitude),
                     originName: origin.name,
-                    // Menu-item picks don't have precomputed route info; '' matches
-                    // what the map screen already receives when routeInfo is missing.
-                    routeDistance: '',
-                    routeDuration: '',
+                    routeDistance: recommendation.routeInfo?.distance ?? '',
+                    routeDuration: recommendation.routeInfo?.duration ?? '',
                   },
                 })
               }
@@ -207,9 +193,47 @@ function PlaceCard({ recommendation, rank, expanded, onToggle, origin }: PlaceCa
                 Navigate →
               </ThemedText>
             </Pressable>
-          ) : null}
+          </View>
+        </View>
+      </View>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        onPress={onToggle}
+        style={({ pressed }) => [styles.mealToggle, pressed && styles.pressed]}>
+        <ThemedText type="smallBold" themeColor="accent">
+          {expanded ? 'Hide meal recommendations' : `See ${recommendation.meals.length} meal recommendations`}
+        </ThemedText>
+        <ThemedText style={[styles.chevron, { color: theme.accent }]}>{expanded ? '⌃' : '⌄'}</ThemedText>
+      </Pressable>
+
+      {expanded ? (
+        <View style={[styles.mealList, { borderTopColor: theme.border }]}>
+          {recommendation.meals.map((meal) => (
+            <MealRow key={meal.name} meal={meal} />
+          ))}
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function MealRow({ meal }: { meal: MealRecommendation }) {
+  const theme = useTheme();
+  const tagStyle = getTagStyle(meal.healthTag, theme);
+
+  return (
+    <View style={styles.mealRow}>
+      <View style={styles.mealText}>
+        <ThemedText type="smallBold">{meal.name}</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          {meal.description}
+        </ThemedText>
+      </View>
+      <View style={[styles.tag, tagStyle.container]}>
+        <ThemedText style={[styles.tagText, tagStyle.text]}>{meal.healthTag}</ThemedText>
+      </View>
     </View>
   );
 }
@@ -282,7 +306,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   placeHeader: {
-    alignItems: 'flex-start',
+    alignItems: 'center',
     flexDirection: 'row',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
@@ -295,27 +319,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 30,
   },
-  itemDetails: {
+  placeName: {
     flex: 1,
-    gap: Spacing.one,
+    gap: Spacing.half,
   },
-  itemTitleRow: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: Spacing.two,
-    justifyContent: 'space-between',
-  },
-  itemTitle: {
-    flex: 1,
+  placeTitle: {
     fontSize: 19,
     fontWeight: 800,
     lineHeight: 24,
   },
-  travelTime: {
-    flexShrink: 0,
-    lineHeight: 24,
-  },
-  locationToggle: {
+  mealToggle: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -327,15 +340,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 700,
   },
-  locationSection: {
-    alignItems: 'center',
+  mealList: {
     borderTopWidth: 1,
+    gap: Spacing.three,
+    padding: Spacing.three,
+  },
+  mealRow: {
     flexDirection: 'row',
     gap: Spacing.two,
     justifyContent: 'space-between',
-    padding: Spacing.three,
   },
-  locationText: {
+  mealText: {
     flex: 1,
     gap: Spacing.half,
   },
