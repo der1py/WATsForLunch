@@ -1,0 +1,242 @@
+[
+  {
+    "name": "Arts Lecture Hall (AL)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.468825,
+    "longitude": -80.541934
+  },
+  {
+    "name": "B.C. Matthews Hall (BMH)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.47376,
+    "longitude": -80.545369
+  },
+  {
+    "name": "Biology 1 (B1)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.471032,
+    "longitude": -80.543107
+  },
+  {
+    "name": "Biology 2 (B2)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.47084,
+    "longitude": -80.543362
+  },
+  {
+    "name": "Carl A. Pollock Hall (CPH)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.470747,
+    "longitude": -80.539213
+  },
+  {
+    "name": "Centre for Environmental and Information Technology (EIT)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.471531,
+    "longitude": -80.542018
+  },
+  {
+    "name": "Chemistry 2 (C2)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.472165,
+    "longitude": -80.543119
+  },
+  {
+    "name": "Claudette Millar Hall (CMH)",
+    "address": "165 University Avenue West, Waterloo, ON N2L 3G8",
+    "latitude": 43.470234,
+    "longitude": -80.535891
+  },
+  {
+    "name": "Dana Porter Library (DP)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.469706,
+    "longitude": -80.542254
+  },
+  {
+    "name": "Douglas Wright Engineering Building (DWE)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.470083,
+    "longitude": -80.539685
+  },
+  {
+    "name": "Earth Sciences & Chemistry (ESC)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.471138,
+    "longitude": -80.542486
+  },
+  {
+    "name": "Energy Research Centre (ERC)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.473436,
+    "longitude": -80.544461
+  },
+  {
+    "name": "Engineering 2 (E2)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.470901,
+    "longitude": -80.540234
+  },
+  {
+    "name": "Engineering 3 (E3)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.471985,
+    "longitude": -80.541058
+  },
+  {
+    "name": "Engineering 5 (E5)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.47278,
+    "longitude": -80.539945
+  },
+  {
+    "name": "Engineering 6 (E6)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.473206,
+    "longitude": -80.538799
+  },
+  {
+    "name": "Engineering 7 (E7)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.472921,
+    "longitude": -80.539582
+  },
+  {
+    "name": "Environment 1 (EV1)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.468309,
+    "longitude": -80.542458
+  },
+  {
+    "name": "Environment 2 (EV2)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.467917,
+    "longitude": -80.543121
+  },
+  {
+    "name": "Environment 3 (EV3)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.468154,
+    "longitude": -80.543432
+  },
+  {
+    "name": "Health Expansion Building (EXP)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.473432,
+    "longitude": -80.546015
+  },
+  {
+    "name": "J.G. Hagey Hall of the Humanities (HH)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.46808,
+    "longitude": -80.541678
+  },
+  {
+    "name": "J.R. Coutts Engineering Lecture Hall (RCH)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.470286,
+    "longitude": -80.540964
+  },
+  {
+    "name": "Mackenzie King Village (MKV)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.471188,
+    "longitude": -80.551844
+  },
+  {
+    "name": "Mathematics 3 (M3)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.473163,
+    "longitude": -80.544133
+  },
+  {
+    "name": "Mathematics and Computer Building (MC)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.472436,
+    "longitude": -80.543764
+  },
+  {
+    "name": "Mike & Ophelia Lazaridis Quantum-Nano Centre (QNC)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.471216,
+    "longitude": -80.543896
+  },
+  {
+    "name": "Modern Languages (ML)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.468947,
+    "longitude": -80.542809
+  },
+  {
+    "name": "Needles Hall (NH)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.469677,
+    "longitude": -80.543541
+  },
+  {
+    "name": "Optometry (OPT)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.47544,
+    "longitude": -80.545944
+  },
+  {
+    "name": "Physical Activities Complex (PAC)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.472441,
+    "longitude": -80.54564
+  },
+  {
+    "name": "Physics (PHY)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.470554,
+    "longitude": -80.541552
+  },
+  {
+    "name": "Psychology, Anthropology & Sociology (PAS)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.467213,
+    "longitude": -80.542165
+  },
+  {
+    "name": "Ron Eydt Village (REV)",
+    "address": "200 University Avenue West, Waterloo, ON N2J 4C1",
+    "latitude": 43.47015,
+    "longitude": -80.553819
+  },
+  {
+    "name": "Science Teaching Complex (STC)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.470639,
+    "longitude": -80.54359
+  },
+  {
+    "name": "South Campus Hall (SCH)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.469269,
+    "longitude": -80.540316
+  },
+  {
+    "name": "Student Life Centre (SLC)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.471929,
+    "longitude": -80.545348
+  },
+  {
+    "name": "Student Village 1 (V1)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.471521,
+    "longitude": -80.55003
+  },
+  {
+    "name": "William G. Davis Computer Research Centre (DC)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.472764,
+    "longitude": -80.542465
+  },
+  {
+    "name": "William M. Tatham Centre (TC)",
+    "address": "200 University Avenue West, Waterloo, ON N2L 3G1",
+    "latitude": 43.468928,
+    "longitude": -80.541216
+  }
+]
