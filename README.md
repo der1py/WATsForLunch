@@ -16,10 +16,11 @@ npm install
 
 ## Set up environment variables
 
-Copy `.env.example` to `.env`, then add a Google Maps API key:
+Copy `.env.example` to `.env`, then add a Google Maps API key and OpenAI API key:
 
 ```env
 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY="your-google-maps-api-key"
+OPENAI_API_KEY="your-open-ai-api-key"
 ```
 
 The key must be enabled for the Google Routes API and Google Maps Embed API.
