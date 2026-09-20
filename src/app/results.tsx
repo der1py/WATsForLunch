@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -17,9 +17,41 @@ import {
 
 export default function ResultsScreen() {
   const params = useLocalSearchParams();
-  const criteria = getSearchCriteriaFromParams(params);
-  const recommendations = getTopRecommendations(criteria);
-  const [expandedPlaceId, setExpandedPlaceId] = useState<string | null>(recommendations[0]?.id ?? null);
+  const criteria = useMemo(() => getSearchCriteriaFromParams(params), [params]);
+  const criteriaKey = [
+    criteria.building.name,
+    criteria.transport,
+    criteria.openNow,
+    criteria.maximumTravelTime,
+    criteria.eatingPreferences.join(','),
+    criteria.requiredDietary.join(','),
+    criteria.preferredDietary.join(','),
+    criteria.allergies.join(','),
+  ].join('|');
+  const [recommendationResult, setRecommendationResult] = useState<{
+    criteriaKey: string;
+    recommendations: PlaceRecommendation[];
+    expandedPlaceId: string | null;
+  }>({ criteriaKey: '', recommendations: [], expandedPlaceId: null });
+  const isLoading = recommendationResult.criteriaKey !== criteriaKey;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getTopRecommendations(criteria).then((nextRecommendations) => {
+      if (!cancelled) {
+        setRecommendationResult({
+          criteriaKey,
+          recommendations: nextRecommendations,
+          expandedPlaceId: nextRecommendations[0]?.id ?? null,
+        });
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [criteria, criteriaKey]);
 
   return (
     <ThemedView style={styles.container}>
@@ -68,19 +100,26 @@ export default function ResultsScreen() {
           </View>
 
           <View style={styles.recommendations}>
-            {recommendations.map((recommendation, index) => (
-              <PlaceCard
-                expanded={expandedPlaceId === recommendation.id}
-                key={recommendation.id}
-                onToggle={() =>
-                  setExpandedPlaceId((current) =>
-                    current === recommendation.id ? null : recommendation.id
-                  )
-                }
-                rank={index + 1}
-                recommendation={recommendation}
-              />
-            ))}
+            {isLoading ? (
+              <ThemedText themeColor="textSecondary">Calculating walking times…</ThemedText>
+            ) : (
+              recommendationResult.recommendations.map((recommendation, index) => (
+                <PlaceCard
+                  expanded={recommendationResult.expandedPlaceId === recommendation.id}
+                  key={recommendation.id}
+                  onToggle={() =>
+                    setRecommendationResult((current) => ({
+                      ...current,
+                      expandedPlaceId:
+                        current.expandedPlaceId === recommendation.id ? null : recommendation.id,
+                    }))
+                  }
+                  origin={criteria.building}
+                  rank={index + 1}
+                  recommendation={recommendation}
+                />
+              ))
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -93,9 +132,10 @@ type PlaceCardProps = {
   rank: number;
   expanded: boolean;
   onToggle: () => void;
+  origin: { name: string; latitude: number; longitude: number };
 };
 
-function PlaceCard({ recommendation, rank, expanded, onToggle }: PlaceCardProps) {
+function PlaceCard({ recommendation, rank, expanded, onToggle, origin }: PlaceCardProps) {
   const theme = useTheme();
 
   return (
@@ -128,6 +168,11 @@ function PlaceCard({ recommendation, rank, expanded, onToggle }: PlaceCardProps)
                     latitude: String(recommendation.location.latitude),
                     longitude: String(recommendation.location.longitude),
                     name: recommendation.place,
+                    originLatitude: String(origin.latitude),
+                    originLongitude: String(origin.longitude),
+                    originName: origin.name,
+                    routeDistance: recommendation.routeInfo?.distance ?? '',
+                    routeDuration: recommendation.routeInfo?.duration ?? '',
                   },
                 })
               }

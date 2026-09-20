@@ -1,6 +1,5 @@
-import * as Location from 'expo-location';
 import { router, useLocalSearchParams } from 'expo-router';
-import { createElement, useEffect, useState } from 'react';
+import { createElement } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -9,18 +8,11 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import type { RouteInfo } from '@/services/maps';
 
 const MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
-const ROUTES_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
 const MAP_ASPECT_RATIO = 4 / 3;
-
-const API_MODES = {
-  driving: 'DRIVE',
-  walking: 'WALK',
-  bicycling: 'BICYCLE',
-  transit: 'TRANSIT',
-} as const;
-const TRAVEL_MODE: keyof typeof API_MODES = 'walking';
+const TRAVEL_MODE = 'walking';
 
 const DEFAULT_DESTINATION = {
   name: 'Shawarma Hub',
@@ -30,8 +22,8 @@ const DEFAULT_DESTINATION = {
 };
 
 type Coords = { latitude: number; longitude: number };
-type RouteInfo = { duration: string; distance: string };
 type MapDestination = Coords & { name: string; address: string };
+type MapOrigin = Coords & { name: string };
 
 function getFirstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -53,124 +45,28 @@ function getMapDestination(
   };
 }
 
-function useCurrentLocation() {
-  const [coords, setCoords] = useState<Coords | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+function getMapOrigin(params: Record<string, string | string[] | undefined>): MapOrigin | null {
+  const latitude = Number(getFirstParam(params.originLatitude));
+  const longitude = Number(getFirstParam(params.originLongitude));
+  const name = getFirstParam(params.originName)?.trim();
 
-  useEffect(() => {
-    let cancelled = false;
+  if (!name || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return null;
+  }
 
-    (async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          if (!cancelled) setError('Location permission denied');
-          return;
-        }
-
-        const position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        if (!cancelled) setCoords(position.coords);
-      } catch {
-        if (!cancelled) setError('Could not get your location');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return { coords, error, loading };
+  return { name, latitude, longitude };
 }
 
-function formatDuration(seconds: number) {
-  const totalMinutes = Math.max(1, Math.round(seconds / 60));
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return hours > 0 ? `${hours} hr ${minutes} min` : `${minutes} min`;
+function getRouteInfoFromParams(
+  params: Record<string, string | string[] | undefined>
+): RouteInfo | null {
+  const duration = getFirstParam(params.routeDuration)?.trim();
+  const distance = getFirstParam(params.routeDistance)?.trim();
+
+  return duration && distance ? { duration, distance } : null;
 }
 
-function formatDistance(meters: number) {
-  return meters >= 1000
-    ? `${(meters / 1000).toFixed(1)} km`
-    : `${Math.round(meters)} m`;
-}
-
-function useRouteInfo(origin: Coords | null, destination: MapDestination) {
-  const [info, setInfo] = useState<RouteInfo | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const originLatitude = origin?.latitude;
-  const originLongitude = origin?.longitude;
-
-  useEffect(() => {
-    if (originLatitude === undefined || originLongitude === undefined) return;
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const response = await fetch(ROUTES_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Goog-Api-Key': MAPS_API_KEY ?? '',
-            'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters',
-          },
-          body: JSON.stringify({
-            origin: {
-              location: {
-                latLng: {
-                  latitude: originLatitude,
-                  longitude: originLongitude,
-                },
-              },
-            },
-            destination: {
-              location: {
-                latLng: {
-                  latitude: destination.latitude,
-                  longitude: destination.longitude,
-                },
-              },
-            },
-            travelMode: API_MODES[TRAVEL_MODE],
-          }),
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data?.error?.message ?? 'Route request failed');
-        }
-
-        const route = data.routes?.[0];
-        if (!route) throw new Error('No route found');
-
-        if (!cancelled) {
-          setInfo({
-            duration: formatDuration(parseInt(route.duration, 10)),
-            distance: formatDistance(route.distanceMeters ?? 0),
-          });
-        }
-      } catch (cause) {
-        if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : 'Could not get route info');
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [destination.latitude, destination.longitude, originLatitude, originLongitude]);
-
-  return { info, error };
-}
-
-function buildMapUrl(origin: Coords | null, destination: MapDestination) {
+function buildMapUrl(origin: MapOrigin | null, destination: MapDestination) {
   const destinationCoordinates = `${destination.latitude},${destination.longitude}`;
 
   if (!origin) {
@@ -195,27 +91,25 @@ function buildMapEmbedHtml(mapUrl: string, title: string) {
     <style>html, body, iframe { border: 0; height: 100%; margin: 0; padding: 0; width: 100%; }</style>
   </head>
   <body>
-    <iframe
-      title="${escapedTitle}"
-      src="${mapUrl}"
-      allowfullscreen
-      referrerpolicy="strict-origin-when-cross-origin"></iframe>
+    <iframe title="${escapedTitle}" src="${mapUrl}" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
   </body>
 </html>`;
 }
 
-function GoogleMapEmbed({ destination }: { destination: MapDestination }) {
+function GoogleMapEmbed({
+  destination,
+  origin,
+  routeInfo,
+}: {
+  destination: MapDestination;
+  origin: MapOrigin | null;
+  routeInfo: RouteInfo | null;
+}) {
   const theme = useTheme();
-  const { coords, error, loading } = useCurrentLocation();
-  const { info, error: routeError } = useRouteInfo(coords, destination);
-  const mapUrl = buildMapUrl(coords, destination);
+  const mapUrl = buildMapUrl(origin, destination);
 
   return (
-    <View
-      style={[
-        styles.mapCard,
-        { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-      ]}>
+    <View style={[styles.mapCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
       <View style={styles.destinationDetails}>
         <ThemedText type="subtitle">{destination.name}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
@@ -236,40 +130,26 @@ function GoogleMapEmbed({ destination }: { destination: MapDestination }) {
             src: mapUrl,
           })
         ) : (
-          <WebView
-            key={mapUrl}
-            source={{ html: buildMapEmbedHtml(mapUrl, destination.name) }}
-            style={styles.map}
-          />
+          <WebView key={mapUrl} source={{ html: buildMapEmbedHtml(mapUrl, destination.name) }} style={styles.map} />
         )}
       </View>
 
-      {(loading || error || info || routeError) && (
+      {(origin || routeInfo) && (
         <View style={styles.routeDetails}>
-          {loading && (
+          {origin && (
             <ThemedText type="small" themeColor="textSecondary">
-              Getting your location…
+              Starting from {origin.name}
             </ThemedText>
           )}
-          {error && (
-            <ThemedText type="small" themeColor="textSecondary">
-              {error}. Showing the destination only.
-            </ThemedText>
-          )}
-          {info && (
+          {routeInfo && (
             <View style={[styles.routeInfo, { backgroundColor: theme.accentSoft }]}>
               <ThemedText type="smallBold" themeColor="accent">
-                {info.duration}
+                {routeInfo.duration}
               </ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                {info.distance} walk to {destination.name}
+                {routeInfo.distance} walk to {destination.name}
               </ThemedText>
             </View>
-          )}
-          {routeError && (
-            <ThemedText type="small" themeColor="textSecondary">
-              {routeError}
-            </ThemedText>
           )}
         </View>
       )}
@@ -280,6 +160,8 @@ function GoogleMapEmbed({ destination }: { destination: MapDestination }) {
 export default function MapScreen() {
   const params = useLocalSearchParams();
   const destination = getMapDestination(params);
+  const origin = getMapOrigin(params);
+  const routeInfo = getRouteInfoFromParams(params);
 
   return (
     <ThemedView style={styles.container}>
@@ -301,7 +183,7 @@ export default function MapScreen() {
             <ThemedText type="smallBold">Results</ThemedText>
           </Pressable>
 
-          <GoogleMapEmbed destination={destination} />
+          <GoogleMapEmbed destination={destination} origin={origin} routeInfo={routeInfo} />
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -309,15 +191,8 @@ export default function MapScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  safeArea: {
-    alignSelf: 'center',
-    flex: 1,
-    maxWidth: MaxContentWidth,
-    width: '100%',
-  },
+  container: { flex: 1 },
+  safeArea: { alignSelf: 'center', flex: 1, maxWidth: MaxContentWidth, width: '100%' },
   scrollContent: {
     gap: Spacing.five,
     paddingBottom: Spacing.five,
@@ -331,36 +206,12 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
     marginLeft: -Spacing.one,
   },
-  backArrow: {
-    fontSize: 30,
-    lineHeight: 26,
-  },
-  mapCard: {
-    borderRadius: Spacing.four,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  destinationDetails: {
-    gap: Spacing.half,
-    padding: Spacing.three,
-  },
-  mapContainer: {
-    aspectRatio: MAP_ASPECT_RATIO,
-    width: '100%',
-  },
-  map: {
-    flex: 1,
-  },
-  routeDetails: {
-    gap: Spacing.two,
-    padding: Spacing.three,
-  },
-  routeInfo: {
-    borderRadius: Spacing.two,
-    gap: Spacing.half,
-    padding: Spacing.two,
-  },
-  pressed: {
-    opacity: 0.72,
-  },
+  backArrow: { fontSize: 30, lineHeight: 26 },
+  mapCard: { borderRadius: Spacing.four, borderWidth: 1, overflow: 'hidden' },
+  destinationDetails: { gap: Spacing.half, padding: Spacing.three },
+  mapContainer: { aspectRatio: MAP_ASPECT_RATIO, width: '100%' },
+  map: { flex: 1 },
+  routeDetails: { gap: Spacing.two, padding: Spacing.three },
+  routeInfo: { borderRadius: Spacing.two, gap: Spacing.half, padding: Spacing.two },
+  pressed: { opacity: 0.72 },
 });
