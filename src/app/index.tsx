@@ -1,16 +1,16 @@
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import {
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BuildingMultiSelect } from '@/components/building-multi-select';
 import { DietaryPreferenceList } from '@/components/dietary-preference-list';
 import { SelectionChipGroup } from '@/components/selection-chip-group';
 import { ThemedText } from '@/components/themed-text';
@@ -18,23 +18,23 @@ import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
-    allergyOptions,
-    dietaryRestrictionOptions,
-    eatingPreferenceOptions,
-    getDefaultSearchCriteria,
-    transportOptions,
-    travelTimeOptions,
-    type Allergen,
-    type DietaryRestriction,
-    type EatingPreference,
-    type Transport,
-    type TravelTime,
+  allergyOptions,
+  dietaryRestrictionOptions,
+  eatingPreferenceOptions,
+  getDefaultSearchCriteria,
+  transportOptions,
+  travelTimeOptions,
+  type Allergen,
+  type DietaryRestriction,
+  type EatingPreference,
+  type Transport,
+  type TravelTime,
 } from '@/services/recommendations';
 
 export default function HomeScreen() {
   const defaults = getDefaultSearchCriteria();
   const theme = useTheme();
-  const [location, setLocation] = useState(defaults.location);
+  const [selectedBuilding, setSelectedBuilding] = useState(defaults.building);
   const [transport, setTransport] = useState<Transport>(defaults.transport);
   const [openNow, setOpenNow] = useState(defaults.openNow);
   const [maximumTravelTime, setMaximumTravelTime] = useState<TravelTime>(
@@ -103,7 +103,7 @@ export default function HomeScreen() {
     router.push({
       pathname: '/results',
       params: {
-        location: location.trim() || defaults.location,
+        building: selectedBuilding.name,
         transport,
         openNow: String(openNow),
         maximumTravelTime: String(maximumTravelTime),
@@ -136,22 +136,9 @@ export default function HomeScreen() {
 
             <View style={styles.form}>
               <FieldLabel label="Where are you?" />
-              <TextInput
-                accessibilityLabel="Location"
-                autoCapitalize="characters"
-                onChangeText={setLocation}
-                placeholder="MC, STC, or another building"
-                placeholderTextColor={theme.textSecondary}
-                selectionColor={theme.accent}
-                style={[
-                  styles.locationInput,
-                  {
-                    backgroundColor: theme.backgroundElement,
-                    borderColor: theme.border,
-                    color: theme.text,
-                  },
-                ]}
-                value={location}
+              <BuildingMultiSelect
+                onChange={setSelectedBuilding}
+                selectedBuilding={selectedBuilding}
               />
 
               <FieldLabel label="How are you getting there?" />

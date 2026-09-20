@@ -14,6 +14,7 @@ export default function TabLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="results" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="map" options={{ animation: 'slide_from_right' }} />
       </Stack>
     </ThemeProvider>
   );
