@@ -7,7 +7,7 @@ import {
   type HealthTag,
 } from '@/domain/recommendations/filter-and-rank';
 import { getBuildingByName, getDefaultBuilding, type Building } from '@/services/buildings';
-import { getWalkingRouteInfo, type RouteInfo } from '@/services/maps';
+import { getWalkingRouteInfos, type RouteInfo } from '@/services/maps';
 
 export const transportOptions = ['Walk', 'Bike', 'Car', 'Transit'] as const;
 export const travelTimeOptions = [5, 10, 15, 20, 30] as const;
@@ -138,27 +138,30 @@ export async function getTopRecommendations(
   const selectedRestaurants = selectedRestaurantIds.map(
     (id) => locatedRestaurantFixtures.find((restaurant) => restaurant.id === id)!
   );
+  const routeInfos = await getWalkingRouteInfos(
+    criteria.building,
+    selectedRestaurants.map((restaurant) => ({
+      id: restaurant.id,
+      ...restaurant.location,
+    }))
+  ).catch(() => new Map<string, RouteInfo>());
 
-  return Promise.all(
-    selectedRestaurants.map(async (restaurant) => {
-      const routeInfo = await getWalkingRouteInfo(criteria.building, restaurant.location).catch(
-        () => null
-      );
+  return selectedRestaurants.map((restaurant) => {
+    const routeInfo = routeInfos.get(restaurant.id) ?? null;
 
-      return {
-        id: restaurant.id,
-        place: restaurant.place,
-        travelTime: routeInfo?.duration ?? 'Walking time unavailable',
-        location: { ...restaurant.location },
-        meals: restaurant.meals.map(({ name, description, healthTag }) => ({
-          name,
-          description,
-          healthTag,
-        })),
-        routeInfo,
-      };
-    })
-  );
+    return {
+      id: restaurant.id,
+      place: restaurant.place,
+      travelTime: routeInfo?.duration ?? 'Walking time unavailable',
+      location: { ...restaurant.location },
+      meals: restaurant.meals.map(({ name, description, healthTag }) => ({
+        name,
+        description,
+        healthTag,
+      })),
+      routeInfo,
+    };
+  });
 }
 
 function getFirstParam(value: string | string[] | undefined) {
