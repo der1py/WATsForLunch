@@ -133,7 +133,7 @@ export async function getTopRecommendations(
   criteria: SearchCriteria
 ): Promise<PlaceRecommendation[]> {
   const selectedRestaurants = getMenuItemRecommendations(criteria, {
-    count: 3,
+    count: Object.keys(menuRestaurantLocationNames).length,
     restaurants: Object.keys(menuRestaurantLocationNames),
     distinctRestaurants: true,
   }).map((recommendation) => ({
@@ -148,18 +148,26 @@ export async function getTopRecommendations(
     }))
   ).catch(() => new Map<string, RouteInfo>());
 
-  return selectedRestaurants.map((restaurant) => {
-    const routeInfo = routeInfos.get(restaurant.id) ?? null;
+  const maximumTravelSeconds = criteria.maximumTravelTime * 60;
 
-    return {
-      id: restaurant.id,
-      place: restaurant.place,
-      travelTime: routeInfo?.duration ?? 'Walking time unavailable',
-      location: { ...restaurant.location },
-      meals: restaurant.meals,
-      routeInfo,
-    };
-  });
+  return selectedRestaurants
+    .filter((restaurant) => {
+      const routeInfo = routeInfos.get(restaurant.id);
+      return routeInfo !== undefined && routeInfo.durationSeconds <= maximumTravelSeconds;
+    })
+    .slice(0, 3)
+    .map((restaurant) => {
+      const routeInfo = routeInfos.get(restaurant.id)!;
+
+      return {
+        id: restaurant.id,
+        place: restaurant.place,
+        travelTime: routeInfo.duration,
+        location: { ...restaurant.location },
+        meals: restaurant.meals,
+        routeInfo,
+      };
+    });
 }
 
 function getFirstParam(value: string | string[] | undefined) {
